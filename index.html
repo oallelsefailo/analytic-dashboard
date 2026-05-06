@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockett AI — Executive Insights Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0b0e14;
+    --surface: #131720;
+    --surface2: #1a2030;
+    --surface3: #1f2840;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8edf5;
+    --text2: #8b9ab5;
+    --text3: #5a6a85;
+    --accent: #3d7fff;
+    --accent2: #5b9aff;
+    --green: #22c77d;
+    --red: #ff4f6a;
+    --amber: #f59e0b;
+    --purple: #9b72ff;
+    --teal: #0fd4b8;
+    --font: 'DM Sans', system-ui, sans-serif;
+    --mono: 'DM Mono', monospace;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  /* ─── LIGHT MODE ─── */
+  body.light {
+    --bg: #f4f6fa;
+    --surface: #ffffff;
+    --surface2: #f0f2f7;
+    --surface3: #e4e8f0;
+    --border: rgba(0,0,0,0.08);
+    --border2: rgba(0,0,0,0.14);
+    --text: #111827;
+    --text2: #4b5563;
+    --text3: #9ca3af;
+    --accent: #2563eb;
+    --accent2: #3b82f6;
+    --green: #16a34a;
+    --red: #dc2626;
+    --amber: #d97706;
+    --purple: #7c3aed;
+    --teal: #0d9488;
+  }
+
+  /* ─── DATE RANGE PICKER ─── */
+  .date-range-picker {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px;
+    font-size: 12.5px; color: var(--text2);
+    cursor: pointer; user-select: none; position: relative;
+    transition: border-color 0.15s;
+  }
+  .date-range-picker:hover { border-color: var(--border2); color: var(--text); }
+
+  .drp-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    z-index: 100;
+    min-width: 200px;
+    overflow: hidden;
+  }
+
+  body.light .drp-dropdown { box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+
+  .drp-option {
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--text2);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .drp-option:hover  { background: var(--surface2); color: var(--text); }
+  .drp-option.active { color: var(--accent2); font-weight: 500; }
+
+  /* ─── THEME TOGGLE ─── */
+  .theme-btn {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .theme-btn:hover { border-color: var(--border2); background: var(--surface2); }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    overflow: hidden;
+  }
+
+  .shell { display: flex; height: 100vh; overflow: hidden; }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    width: 224px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .logo-area {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo { display: flex; align-items: center; gap: 10px; }
+
+  .logo-mark {
+    width: 34px; height: 34px;
+    background: linear-gradient(135deg, #3d7fff, #9b72ff);
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; color: #fff;
+    flex-shrink: 0;
+  }
+
+  .logo-text { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; }
+  .logo-sub { font-size: 10px; color: var(--text3); letter-spacing: 0.5px; text-transform: uppercase; margin-top: 1px; }
+
+  .nav-section { padding: 14px 12px 4px; }
+
+  .nav-label {
+    font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase;
+    color: var(--text3); padding: 0 8px; margin-bottom: 4px;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: var(--radius);
+    cursor: pointer; color: var(--text2); font-size: 13.5px;
+    transition: all 0.15s; margin-bottom: 1px; user-select: none;
+  }
+
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(61,127,255,0.12); color: var(--accent2); }
+
+  .nav-icon { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
+  .nav-item.active .nav-icon { opacity: 1; }
+
+  .sidebar-footer {
+    margin-top: auto; padding: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .user-pill { display: flex; align-items: center; gap: 10px; }
+
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; color: #fff; flex-shrink: 0;
+  }
+
+  .user-name { font-size: 13px; font-weight: 500; }
+  .user-role { font-size: 11px; color: var(--text3); }
+
+  /* ─── MAIN ─── */
+  .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(11,14,20,0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  body.light .topbar {
+    background: rgba(255,255,255,0.97);
+  }
+
+  /* ─── FULL SCREEN LOADING OVERLAY ─── */
+  .page-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 14px;
+    backdrop-filter: blur(2px);
+  }
+
+  body.light .page-overlay { background: rgba(255,255,255,0.6); }
+
+  .page-overlay-ring {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    border: 4px solid var(--border2);
+    border-top-color: var(--accent2);
+    animation: spin 0.75s linear infinite;
+  }
+
+  .page-overlay-text {
+    font-size: 13px;
+    color: var(--text2);
+    font-weight: 500;
+  }
+
+  /* ─── FULL SCREEN LOADING OVERLAY ─── */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    backdrop-filter: blur(2px);
+    transition: opacity 0.2s;
+  }
+
+  body.light .loading-overlay { background: rgba(255,255,255,0.6); }
+
+  .loading-overlay-ring {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    border: 4px solid var(--border2);
+    border-top-color: var(--accent2);
+    animation: spin 0.75s linear infinite;
+  }
+
+  .loading-overlay-text {
+    font-size: 13px;
+    color: var(--text2);
+    font-weight: 500;
+  }
+  .spinner {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--text3); font-size: 13px; padding: 24px 0;
+  }
+  .spinner-ring {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent2);
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .topbar-left { display: flex; flex-direction: column; gap: 1px; }
+  .page-title { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .page-sub { font-size: 12px; color: var(--text3); }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+
+  .date-range {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px;
+    font-size: 12.5px; color: var(--text2);
+  }
+
+  .live-badge {
+    display: flex; align-items: center; gap: 5px;
+    background: rgba(34,199,125,0.08); border: 1px solid rgba(34,199,125,0.2);
+    border-radius: 6px; padding: 5px 10px;
+    font-size: 11.5px; color: var(--green); font-weight: 500;
+  }
+
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green); animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* ─── CONTENT AREAS ─── */
+  .content { padding: 24px 28px; display: flex; flex-direction: column; gap: 22px; }
+  .page { display: none; }
+  .page.active { display: flex; flex-direction: column; gap: 22px; }
+
+  /* ─── GRIDS ─── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .wide-col  { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+
+  /* ─── KPI CARDS ─── */
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 18px 20px;
+    position: relative; overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .kpi-card:hover { border-color: var(--border2); }
+
+  .kpi-card::after {
+    content: ''; position: absolute; top: -20px; right: -20px;
+    width: 90px; height: 90px; border-radius: 50%; opacity: 0.05;
+  }
+  .kpi-card.blue::after { background: var(--accent); }
+  .kpi-card.green::after { background: var(--green); }
+  .kpi-card.red::after { background: var(--red); }
+  .kpi-card.purple::after { background: var(--purple); }
+
+  .kpi-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .kpi-label { font-size: 11.5px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .kpi-icon {
+    width: 28px; height: 28px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  .kpi-icon.blue   { background: rgba(61,127,255,0.12); }
+  .kpi-icon.green  { background: rgba(34,199,125,0.12); }
+  .kpi-icon.red    { background: rgba(255,79,106,0.12); }
+  .kpi-icon.purple { background: rgba(155,114,255,0.12); }
+
+  .kpi-value { font-size: 28px; font-weight: 600; letter-spacing: -0.8px; margin-bottom: 5px; }
+
+  .kpi-delta { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; }
+  .kpi-delta.up  { color: var(--green); }
+  .kpi-delta.dn  { color: var(--red); }
+  .kpi-delta.neu { color: var(--text3); }
+
+  /* ─── PANELS ─── */
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 15px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .panel-title {
+    font-size: 13.5px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dot.blue   { background: var(--accent); }
+  .dot.green  { background: var(--green); }
+  .dot.purple { background: var(--purple); }
+  .dot.amber  { background: var(--amber); }
+  .dot.teal   { background: var(--teal); }
+  .dot.red    { background: var(--red); }
+
+  .panel-body { padding: 20px; }
+
+  .panel-tag {
+    font-size: 10px; font-weight: 600; padding: 2px 8px;
+    border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .panel-tag.blue  { background: rgba(61,127,255,0.1); color: var(--accent2); }
+  .panel-tag.teal  { background: rgba(15,212,184,0.1); color: var(--teal); }
+
+  /* ─── CHARTS ─── */
+  .chart-wrap { position: relative; width: 100%; height: 220px; }
+  .chart-wrap-tall { position: relative; width: 100%; height: 260px; }
+
+  /* ─── TREND ROWS ─── */
+  .trend-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 0; border-bottom: 1px solid var(--border);
+  }
+  .trend-row:last-child { border-bottom: none; }
+  .trend-label { font-size: 12.5px; color: var(--text2); flex: 1; }
+  .trend-val   { font-size: 12.5px; font-family: var(--mono); width: 56px; text-align: right; }
+  .trend-delta { font-size: 11.5px; font-weight: 500; width: 72px; text-align: right; white-space: nowrap; flex-shrink: 0; }
+  .trend-delta.up { color: var(--green); }
+  .trend-delta.dn { color: var(--red); }
+
+  /* ─── DONUT ─── */
+  .donut-wrap { position: relative; width: 144px; height: 144px; flex-shrink: 0; }
+  .donut-center {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .donut-val  { font-size: 24px; font-weight: 600; letter-spacing: -0.5px; }
+  .donut-sub  { font-size: 10.5px; color: var(--text3); }
+
+  .legend-list { display: flex; flex-direction: column; gap: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 9px; }
+  .legend-swatch { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+  .legend-label  { font-size: 12.5px; color: var(--text2); flex: 1; }
+  .legend-val    { font-size: 12.5px; font-family: var(--mono); }
+
+  /* ─── ANOMALY STRIP ─── */
+  .anomaly {
+    background: rgba(255,79,106,0.05); border: 1px solid rgba(255,79,106,0.15);
+    border-radius: var(--radius); padding: 13px 18px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .anomaly-icon { font-size: 20px; flex-shrink: 0; }
+  .anomaly-content { flex: 1; }
+  .anomaly-title { font-size: 13px; font-weight: 600; color: #ff6b81; margin-bottom: 2px; }
+  .anomaly-desc  { font-size: 12px; color: var(--text3); }
+
+  /* ─── SEARCH TABLE ─── */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    text-align: left; font-size: 10.5px; color: var(--text3);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 0 8px 10px 0; font-weight: 500;
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    padding: 9px 8px 9px 0; font-size: 13px;
+    border-bottom: 1px solid var(--border); vertical-align: middle;
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+
+  .term-badge {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 5px; padding: 2px 8px;
+    font-size: 11.5px; font-family: var(--mono); color: var(--text);
+    white-space: nowrap;
+  }
+
+  .mini-bar-track { height: 5px; background: var(--surface2); border-radius: 3px; width: 72px; overflow: hidden; }
+  .mini-bar-fill  { height: 100%; border-radius: 3px; background: var(--accent); opacity: 0.6; }
+
+  .status { display: flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
+  .s-dot  { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .s-dot.ok   { background: var(--green); }
+  .s-dot.warn { background: var(--amber); }
+  .s-dot.bad  { background: var(--red); }
+
+  /* ─── SEO LIST ─── */
+  .seo-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .seo-row:last-child { border-bottom: none; }
+  .seo-rank   { font-size: 11px; color: var(--text3); font-family: var(--mono); width: 20px; flex-shrink: 0; }
+  .seo-page   { flex: 1; font-size: 12.5px; color: var(--text2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .seo-page strong { color: var(--text); font-weight: 500; }
+  .seo-impr   { font-size: 12px; font-family: var(--mono); color: var(--text3); width: 60px; text-align: right; flex-shrink: 0; }
+  .ctr-track  { width: 56px; height: 4px; background: var(--surface2); border-radius: 2px; flex-shrink: 0; }
+  .ctr-fill   { height: 100%; border-radius: 2px; }
+  .seo-ctr    { font-size: 12px; font-family: var(--mono); width: 48px; text-align: right; flex-shrink: 0; }
+
+  /* ─── OPP CARDS ─── */
+  .opp-list { display: flex; flex-direction: column; gap: 10px; }
+  .opp-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 13px 16px;
+    display: flex; align-items: center; gap: 14px;
+    transition: border-color 0.15s; cursor: default;
+  }
+  .opp-card:hover { border-color: var(--border2); }
+
+  .opp-icon {
+    width: 36px; height: 36px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+
+  .opp-content { flex: 1; min-width: 0; }
+  .opp-title   { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+  .opp-desc    { font-size: 12px; color: var(--text3); }
+
+  .priority-tag {
+    font-size: 10.5px; font-weight: 700; padding: 3px 9px;
+    border-radius: 5px; text-transform: uppercase; letter-spacing: 0.4px; flex-shrink: 0;
+  }
+  .priority-tag.high { background: rgba(255,79,106,0.1);  color: #ff6b81; border: 1px solid rgba(255,79,106,0.2); }
+  .priority-tag.med  { background: rgba(245,158,11,0.1);  color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
+  .priority-tag.low  { background: rgba(34,199,125,0.1);  color: #34d399; border: 1px solid rgba(34,199,125,0.2); }
+
+  /* ─── AI PANEL ─── */
+  .ai-panel {
+    background: linear-gradient(135deg, rgba(61,127,255,0.05), rgba(155,114,255,0.05));
+    border: 1px solid rgba(61,127,255,0.18);
+    border-radius: var(--radius-lg); overflow: hidden;
+  }
+
+  .ai-header {
+    padding: 16px 20px; border-bottom: 1px solid rgba(61,127,255,0.1);
+    display: flex; align-items: center; gap: 12px;
+  }
+
+  .ai-badge {
+    background: rgba(61,127,255,0.14); border: 1px solid rgba(61,127,255,0.24);
+    border-radius: 6px; padding: 3px 9px;
+    font-size: 10.5px; font-weight: 700; color: var(--accent2);
+    letter-spacing: 0.4px; text-transform: uppercase;
+  }
+
+  .ai-title { font-size: 14px; font-weight: 600; }
+  .ai-time  { margin-left: auto; font-size: 11px; color: var(--text3); }
+  .ai-body  { padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+
+  .ai-insight { display: flex; gap: 14px; align-items: flex-start; }
+
+  .ai-insight-icon {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0; margin-top: 1px;
+  }
+  .ai-insight-icon.warning  { background: rgba(245,158,11,0.12); }
+  .ai-insight-icon.positive { background: rgba(34,199,125,0.12); }
+  .ai-insight-icon.info     { background: rgba(61,127,255,0.12); }
+  .ai-insight-icon.alert    { background: rgba(255,79,106,0.12); }
+
+  .ai-insight-content { flex: 1; }
+  .ai-insight-title   { font-size: 13.5px; font-weight: 600; margin-bottom: 4px; }
+  .ai-insight-desc    { font-size: 12.5px; color: var(--text2); line-height: 1.65; }
+
+  .action-chips { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
+  .action-chip {
+    background: rgba(61,127,255,0.08); border: 1px solid rgba(61,127,255,0.18);
+    border-radius: 6px; padding: 3px 10px;
+    font-size: 11.5px; color: var(--accent2);
+    font-family: var(--mono); cursor: default;
+  }
+
+  .ai-divider { border: none; border-top: 1px solid rgba(61,127,255,0.07); }
+
+  /* ─── SCROLLBAR ─── */
+  .main::-webkit-scrollbar { width: 5px; }
+  .main::-webkit-scrollbar-track { background: transparent; }
+  .main::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+
+  /* ─── INTEGRATION NOTICE ─── */
+  .data-source-bar {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 16px;
+    font-size: 12px; color: var(--text3);
+    flex-wrap: wrap;
+  }
+  .ds-chip {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 5px; padding: 2px 8px;
+    font-size: 11px; font-family: var(--mono); color: var(--text2);
+  }
+  .ds-chip.connected { border-color: rgba(34,199,125,0.3); color: var(--green); }
+  .ds-chip.pending   { border-color: rgba(245,158,11,0.3); color: var(--amber); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <div class="logo-area">
+      <div class="logo">
+        <div class="logo-mark">M</div>
+        <div>
+          <div class="logo-text">Mockett.com</div>
+          <div class="logo-sub">AI Insights</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Overview</div>
+      <div class="nav-item active" onclick="nav('overview', this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/>
+          <rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.4"/>
+          <rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.4"/>
+          <rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.4"/>
+        </svg>
+        Executive Overview
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Intelligence</div>
+      <div class="nav-item" onclick="nav('search', this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M10.5 10.5l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Search Intelligence
+      </div>
+      <div class="nav-item" onclick="nav('seo', this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M2 12L6 8l3 3 5-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        SEO Performance
+      </div>
+      <div class="nav-item" onclick="nav('merch', this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="8" width="3" height="6" rx="1" fill="currentColor" opacity="0.4"/>
+          <rect x="6.5" y="5" width="3" height="9" rx="1" fill="currentColor" opacity="0.65"/>
+          <rect x="11" y="2" width="3" height="12" rx="1" fill="currentColor"/>
+        </svg>
+        Merchandising
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">AI Layer</div>
+      <div class="nav-item" onclick="nav('ai', this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M8 1.5l1.5 4L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+        </svg>
+        AI Summary Panel
+      </div>
+      <div class="nav-item" onclick="nav('opps', this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M8 2v3M8 11v3M2 8h3M11 8h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.3"/>
+        </svg>
+        Opportunities
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-pill">
+        <div class="avatar">WO</div>
+        <div>
+          <div class="user-name">Web Operations</div>
+          <div class="user-role">mockett.com</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN ═══ -->
+  <main class="main">
+    <!-- Loading overlay -->
+    <div class="page-overlay" id="page-overlay" style="display:none">
+      <div class="page-overlay-ring"></div>
+      <div class="page-overlay-text">Loading data...</div>
+    </div>
+
+    <!-- TOP BAR -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="page-title" id="page-title">Executive Overview</div>
+        <div class="page-sub" id="page-sub">All data sources synced · Last updated 4 min ago</div>
+      </div>
+      <div class="topbar-right">
+
+        <!-- Date range picker -->
+        <div class="date-range-picker" id="drp-toggle" onclick="toggleDatePicker()">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <rect x="1" y="2.5" width="11" height="9.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M4 1v3M9 1v3M1 5.5h11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+          <span id="drp-label">Last 30 Days</span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        </div>
+
+        <!-- Dropdown -->
+        <div class="drp-dropdown" id="drp-dropdown" style="display:none">
+          <div class="drp-option" onclick="setDays(7,  'Last 7 Days')">Last 7 Days</div>
+          <div class="drp-option" onclick="setDays(14, 'Last 14 Days')">Last 14 Days</div>
+          <div class="drp-option active" onclick="setDays(30, 'Last 30 Days')">Last 30 Days</div>
+          <div class="drp-option" onclick="setDays(90, 'Last Quarter')">Last Quarter (90 days)</div>
+          <div class="drp-option" onclick="setDays(270,'Last 3 Quarters')">Last 3 Quarters</div>
+        </div>
+
+        <!-- Theme toggle -->
+        <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark mode">
+          <span id="theme-icon">☀️</span>
+        </button>
+
+        <div class="live-badge">
+          <div class="live-dot"></div> Live
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: EXECUTIVE OVERVIEW
+    ══════════════════════════════════════ -->
+    <div id="page-overview" class="content page active">
+
+      <!-- Data source status bar -->
+      <div class="data-source-bar">
+        <span>Data sources:</span>
+        <span class="ds-chip connected">● GA4</span>
+        <span class="ds-chip connected">● Search Console</span>
+        <span class="ds-chip connected">● Magento 2</span>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-grid">
+        <div class="kpi-card blue" id="kpi-revenue">
+          <div class="kpi-header">
+            <div class="kpi-label">Total Revenue</div>
+            <div class="kpi-icon blue">💰</div>
+          </div>
+          <div class="kpi-value">$284,920</div>
+          <div class="kpi-delta up">▲ 12.4% vs last month</div>
+        </div>
+        <div class="kpi-card green" id="kpi-sessions">
+          <div class="kpi-header">
+            <div class="kpi-label">Sessions</div>
+            <div class="kpi-icon green">👥</div>
+          </div>
+          <div class="kpi-value">41,882</div>
+          <div class="kpi-delta up">▲ 8.1% vs last month</div>
+        </div>
+        <div class="kpi-card red" id="kpi-conversion">
+          <div class="kpi-header">
+            <div class="kpi-label">Orders per 100 Visitors</div>
+            <div class="kpi-icon red">🎯</div>
+          </div>
+          <div class="kpi-value">2.31%</div>
+          <div class="kpi-delta dn">▼ down vs last month</div>
+        </div>
+        <div class="kpi-card purple" id="kpi-engagement">
+          <div class="kpi-header">
+            <div class="kpi-label">Visitor Engagement Rate</div>
+            <div class="kpi-icon purple">🔍</div>
+          </div>
+          <div class="kpi-value">63.4%</div>
+          <div class="kpi-delta neu">— flat vs last month</div>
+        </div>
+      </div>
+
+      <!-- Revenue chart + donut -->
+      <div class="wide-col">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><div class="dot blue"></div>Revenue &amp; Sessions — 30 Days</div>
+            <span class="panel-tag blue">GA4</span>
+          </div>
+          <div class="panel-body">
+            <div class="chart-wrap">
+              <canvas id="revChart" role="img" aria-label="Line chart of revenue and sessions over 30 days">Revenue and sessions over 30 days, both trending upward.</canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><div class="dot purple"></div>Traffic Sources</div>
+          </div>
+          <div class="panel-body">
+            <div style="display:flex; align-items:center; gap:20px;">
+              <div class="donut-wrap">
+                <canvas id="donutChart" role="img" aria-label="Donut chart: Organic 48%, Direct 22%, Referral 18%, Paid 12%">Traffic: Organic 48%, Direct 22%, Referral 18%, Paid 12%.</canvas>
+                <div class="donut-center">
+                  <div class="donut-val">48%</div>
+                  <div class="donut-sub">organic</div>
+                </div>
+              </div>
+              <div class="legend-list">
+                <div class="legend-item"><div class="legend-swatch" style="background:#3d7fff"></div><div class="legend-label">Organic</div><div class="legend-val">48%</div></div>
+                <div class="legend-item"><div class="legend-swatch" style="background:#9b72ff"></div><div class="legend-label">Direct</div><div class="legend-val">22%</div></div>
+                <div class="legend-item"><div class="legend-swatch" style="background:#0fd4b8"></div><div class="legend-label">Referral</div><div class="legend-val">18%</div></div>
+                <div class="legend-item"><div class="legend-swatch" style="background:#f59e0b"></div><div class="legend-label">Paid</div><div class="legend-val">12%</div></div>
+                <div style="margin-top:10px;font-size:11px;color:var(--text3);line-height:1.7;">
+                  <div><b style="color:var(--text2)">Organic</b> — found you via Google</div>
+                  <div><b style="color:var(--text2)">Direct</b> — typed your URL directly</div>
+                  <div><b style="color:var(--text2)">Referral</b> — clicked a link on another site</div>
+                  <div><b style="color:var(--text2)">Paid</b> — came from an ad</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category revenue + trends -->
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><div class="dot green"></div>Top Categories by Revenue</div>
+            <span class="panel-tag blue">Magento</span>
+          </div>
+          <div class="panel-body">
+            <div class="chart-wrap" id="catChart-wrap">
+              <canvas id="catChart" role="img" aria-label="Bar chart of top revenue categories">Top categories by revenue.</canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><div class="dot amber"></div><span id="trend-period-label">Category Trends</span></div>
+            <span class="panel-tag teal">delta</span>
+          </div>
+          <div id="trend-rows" style="overflow-y:auto; max-height:360px; padding:0 20px;">
+            <div class="spinner"><div class="spinner-ring"></div>Loading...</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: SEARCH INTELLIGENCE
+    ══════════════════════════════════════ -->
+    <div id="page-search" class="content page">
+      <div class="kpi-grid">
+        <div class="kpi-card blue">
+          <div class="kpi-header"><div class="kpi-label">Clean Searches</div><div class="kpi-icon blue">🔍</div></div>
+          <div class="kpi-value">18,441</div>
+          <div class="kpi-delta up">▲ 5.2% this month</div>
+        </div>
+        <div class="kpi-card red">
+          <div class="kpi-header"><div class="kpi-label">Zero-Result Terms</div><div class="kpi-icon red">⛔</div></div>
+          <div class="kpi-value">342</div>
+          <div class="kpi-delta dn">▲ needs attention</div>
+        </div>
+        <div class="kpi-card green">
+          <div class="kpi-header"><div class="kpi-label">Search → Purchase</div><div class="kpi-icon green">✓</div></div>
+          <div class="kpi-value">4.8%</div>
+          <div class="kpi-delta up">▲ 0.4pp</div>
+        </div>
+        <div class="kpi-card purple">
+          <div class="kpi-header"><div class="kpi-label">Bot-Filtered</div><div class="kpi-icon purple">🛡</div></div>
+          <div class="kpi-value">2,118</div>
+          <div class="kpi-delta neu">— auto-filtered</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><div class="dot blue"></div>Top Clean Search Terms</div>
+            <span class="panel-tag blue">Custom logger</span>
+          </div>
+          <div class="panel-body">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Term</th>
+                  <th>Volume</th>
+                  <th>Results</th>
+                  <th>CTR</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="term-badge">cable raceway</span></td>
+                  <td>934</td>
+                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:90%"></div></div></td>
+                  <td>72%</td>
+                  <td><span class="status"><span class="s-dot ok"></span>Good</span></td>
+                </tr>
+                <tr>
+                  <td><span class="term-badge">under desk power</span></td>
+                  <td>812</td>
+                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:78%"></div></div></td>
+                  <td>29%</td>
+                  <td><span class="status"><span class="s-dot warn"></span>Low CTR</span></td>
+                </tr>
+                <tr>
+                  <td><span class="term-badge">wire organizer</span></td>
+                  <td>744</td>
+                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:74%"></div></div></td>
+                  <td>61%</td>
+                  <td><span class="status"><span class="s-dot ok"></span>Good</span></td>
+                </tr>
+                <tr>
+                  <td><span class="term-badge">desk grommet</span></td>
+                  <td>521</td>
+                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:55%"></div></div></td>
+                  <td>45%</td>
+                  <td><span class="status"><span class="s-dot ok"></span>OK</span></td>
+                </tr>
+                <tr>
+                  <td><span class="term-badge">cable tray</span></td>
+                  <td>488</td>
+                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:50%"></div></div></td>
+                  <td>80%</td>
+                  <td><span class="status"><span class="s-dot ok"></span>Good</span></td>
+                </tr>
+                <tr>
+                  <td><span class="term-badge">conference power hub</span></td>
+                  <td>312</td>
+                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:30%"></div></div></td>
+                  <td>11%</td>
+                  <td><span class="status"><span class="s-dot bad"></span>Exit risk</span></td>
+                </tr>
+                <tr>
+                  <td><span class="term-badge">wire sleeve</span></td>
+                  <td>277</td>
+                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:28%"></div></div></td>
+                  <td>38%</td>
+                  <td><span class="status"><span class="s-dot warn"></span>Review</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><div class="dot teal"></div>Search Volume — 30 Day Trend</div>
+          </div>
+          <div class="panel-body">
+            <div class="chart-wrap-tall">
+              <canvas id="searchChart" role="img" aria-label="Line chart of daily clean search volume">Daily clean search volume over 30 days.</canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="anomaly">
+        <div class="anomaly-icon">🔎</div>
+        <div class="anomaly-content">
+          <div class="anomaly-title">High-volume exits — "conference power hub"</div>
+          <div class="anomaly-desc">312 searches/mo with 11% click-through. Users expect a dedicated category. Suggested: review_search_redirects, review_search_synonyms in Magento admin.</div>
+        </div>
+        <div class="priority-tag high">Action</div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: SEO PERFORMANCE
+    ══════════════════════════════════════ -->
+    <div id="page-seo" class="content page">
+      <div class="kpi-grid">
+        <div class="kpi-card blue" id="kpi-impressions">
+          <div class="kpi-header"><div class="kpi-label">Total Impressions</div><div class="kpi-icon blue">👁</div></div>
+          <div class="kpi-value">1.24M</div>
+          <div class="kpi-delta up">▲ 9.2%</div>
+        </div>
+        <div class="kpi-card green" id="kpi-position">
+          <div class="kpi-header"><div class="kpi-label">Avg. Position</div><div class="kpi-icon green">📍</div></div>
+          <div class="kpi-value">14.3</div>
+          <div class="kpi-delta up">▲ improved 2.1</div>
+        </div>
+        <div class="kpi-card red" id="kpi-ctr">
+          <div class="kpi-header"><div class="kpi-label">Avg. CTR</div><div class="kpi-icon red">→</div></div>
+          <div class="kpi-value">2.8%</div>
+          <div class="kpi-delta dn">▼ 0.2pp</div>
+        </div>
+        <div class="kpi-card purple" id="kpi-low-ctr">
+          <div class="kpi-header"><div class="kpi-label">Low CTR Pages</div><div class="kpi-icon purple">⚠</div></div>
+          <div class="kpi-value">38</div>
+          <div class="kpi-delta dn">▲ needs attention</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><div class="dot amber"></div>High Impressions · Low CTR — Top Opportunities</div>
+            <span class="panel-tag blue">Search Console</span>
+          </div>
+          <div class="panel-body" id="seo-page-list">
+            <div class="spinner"><div class="spinner-ring"></div>Loading SEO data...</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><div class="dot teal"></div>Impressions vs. CTR (scatter)</div>
+          </div>
+          <div class="panel-body">
+            <div class="chart-wrap-tall">
+              <canvas id="seoChart" role="img" aria-label="Scatter plot of pages by impressions and CTR">Each point is a page. High impressions with low CTR = opportunity.</canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: MERCHANDISING
+    ══════════════════════════════════════ -->
+    <div id="page-merch" class="content page">
+      <div class="kpi-grid">
+        <div class="kpi-card blue" id="kpi-merch-topcategory">
+          <div class="kpi-header"><div class="kpi-label">Top Category Revenue</div><div class="kpi-icon blue">📦</div></div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Loading...</div>
+        </div>
+        <div class="kpi-card green" id="kpi-merch-topproduct">
+          <div class="kpi-header"><div class="kpi-label">Top Product Last Month</div><div class="kpi-icon green">⭐</div></div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Loading...</div>
+        </div>
+        <div class="kpi-card red" id="kpi-merch-dormant">
+          <div class="kpi-header"><div class="kpi-label">Dormant Top Sellers</div><div class="kpi-icon red">⚠️</div></div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Strong last month, 0 orders this month</div>
+        </div>
+        <div class="kpi-card purple" id="kpi-merch-categories">
+          <div class="kpi-header"><div class="kpi-label">Categories Tracked</div><div class="kpi-icon purple">🗂</div></div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">With revenue data</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><div class="dot blue"></div><span id="merch-products-label">Top Products by Revenue — Last Month</span></div>
+            <span class="panel-tag blue">Magento</span>
+          </div>
+          <div class="panel-body">
+            <div class="chart-wrap">
+              <canvas id="merchChart" role="img" aria-label="Bar chart of products frequently viewed but not purchased">Products with highest view-without-purchase count.</canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title"><div class="dot green"></div>Revenue vs. Traffic — Categories</div>
+          </div>
+          <div class="panel-body" id="merch-trend-rows">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: AI SUMMARY PANEL
+    ══════════════════════════════════════ -->
+    <div id="page-ai" class="content page">
+      <div class="ai-panel">
+        <div class="ai-header">
+          <div class="ai-badge">AI Summary</div>
+          <div class="ai-title">Executive Brief · Live Data</div>
+          <div class="ai-time" id="ai-generated-time">Loading...</div>
+        </div>
+        <div class="ai-body" id="ai-body">
+          <div class="spinner"><div class="spinner-ring"></div>Generating summary from live data — this takes a few seconds...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: OPPORTUNITIES
+    ══════════════════════════════════════ -->
+    <div id="page-opps" class="content page">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><div class="dot amber"></div>Actionable Opportunities — Ranked by Impact</div>
+          <span class="panel-tag teal">Live Data</span>
+        </div>
+        <div class="panel-body">
+          <div class="opp-list" id="opp-list">
+            <div class="spinner"><div class="spinner-ring"></div>Analyzing data for opportunities...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Full-screen loading overlay -->
+<div class="loading-overlay" id="loading-overlay" style="display:none">
+  <div class="loading-overlay-ring"></div>
+  <div class="loading-overlay-text" id="loading-overlay-text">Loading data...</div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+/* ─── THEME TOGGLE ─── */
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  document.getElementById('theme-icon').textContent = isLight ? '🌙' : '☀️';
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  // Only rebuild charts (colors change), never refetch data
+  rebuildChartsOnly();
+}
+
+function rebuildChartsOnly() {
+  // Redraw existing charts with current theme colors — no API calls
+  if (revChartInst)    { revChartInst.update(); }
+  if (donutChartInst)  { donutChartInst.update(); }
+  if (catChartInst)    { catChartInst.update(); }
+  if (searchChartInst) { searchChartInst.update(); }
+  if (seoChartInst)    { seoChartInst.update(); }
+  if (merchChartInst)  { merchChartInst.update(); }
+}
+
+// Apply saved theme on load
+if (localStorage.getItem('theme') === 'light') {
+  document.body.classList.add('light');
+  document.getElementById('theme-icon').textContent = '🌙';
+}
+
+/* ─── DATE RANGE PICKER ─── */
+let DAYS = 30;
+
+function toggleDatePicker() {
+  const dd = document.getElementById('drp-dropdown');
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+
+function setDays(days, label) {
+  DAYS = days;
+  document.getElementById('drp-label').textContent = label;
+  document.getElementById('drp-dropdown').style.display = 'none';
+  document.querySelectorAll('.drp-option').forEach(o => o.classList.remove('active'));
+  event.target.classList.add('active');
+  loadDashboard();
+}
+
+// Close picker when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('#drp-toggle') && !e.target.closest('#drp-dropdown')) {
+    const dd = document.getElementById('drp-dropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});
+
+/* ─── GLOBAL LOADING STATE ─── */
+function showLoadingState(label) {
+  const overlay = document.getElementById('loading-overlay');
+  const text    = document.getElementById('loading-overlay-text');
+  if (overlay) overlay.style.display = 'flex';
+  if (text)    text.textContent = label || 'Loading data...';
+  // Reset text panels to spinners
+  const tr  = document.getElementById('trend-rows');
+  const mtr = document.getElementById('merch-trend-rows');
+  const sl  = document.getElementById('seo-page-list');
+  if (tr)  tr.innerHTML  = '<div class="spinner" style="padding:12px 20px"><div class="spinner-ring"></div>Loading...</div>';
+  if (mtr) mtr.innerHTML = '<div class="spinner" style="padding:12px 20px"><div class="spinner-ring"></div>Loading...</div>';
+  if (sl)  sl.innerHTML  = '<div class="spinner"><div class="spinner-ring"></div>Loading SEO data...</div>';
+  const ab = document.getElementById('ai-body');
+  const ol = document.getElementById('opp-list');
+  if (ab) ab.innerHTML = '<div class="spinner"><div class="spinner-ring"></div>Generating summary — takes a few seconds...</div>';
+  if (ol) ol.innerHTML = '<div class="spinner"><div class="spinner-ring"></div>Analyzing data for opportunities...</div>';
+}
+
+function hideLoadingState() {
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+/* ─── NAVIGATION ─── */
+const PAGES = {
+  overview: { title: 'Executive Overview',      sub: 'All data sources synced · Last updated 4 min ago' },
+  search:   { title: 'Search Intelligence',     sub: 'Clean search logger · Bot-filtered · 30-day window' },
+  seo:      { title: 'SEO Performance',         sub: 'Google Search Console + GA4 · Impressions & CTR' },
+  merch:    { title: 'Merchandising',           sub: 'Magento product & category engagement' },
+  ai:       { title: 'AI Summary Panel',        sub: 'GPT-4.1 executive brief · Constrained recommendations' },
+  opps:     { title: 'Opportunities',           sub: 'AI-detected · Ranked by estimated impact' }
+};
+
+function nav(id, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.getElementById('page-title').textContent = PAGES[id].title;
+  document.getElementById('page-sub').textContent   = PAGES[id].sub;
+}
+
+/* ─── CHART HELPERS ─── */
+const GRID  = 'rgba(255,255,255,0.05)';
+const TICKS = '#5a6a85';
+const TT    = { backgroundColor:'#1a2030', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#e8edf5', bodyColor:'#8b9ab5', padding:10, cornerRadius:8 };
+
+function days30Labels() {
+  return Array.from({length:30}, (_,i) => {
+    const d = new Date(2026, 3, 7 + i);
+    return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  });
+}
+
+function wave(n, base, amp) {
+  return Array.from({length:n}, (_,i) => Math.round(base + Math.sin(i*0.55)*amp + (Math.random()-0.4)*amp*0.4));
+}
+
+const L30 = days30Labels();
+
+/* ─── CHART INSTANCES (kept in scope so we can update them) ─── */
+let revChartInst, donutChartInst, catChartInst, searchChartInst, seoChartInst, merchChartInst;
+
+const CHART_COLORS = {
+  blue:   ['rgba(61,127,255,0.8)','rgba(61,127,255,0.65)','rgba(61,127,255,0.55)','rgba(61,127,255,0.45)','rgba(255,79,106,0.55)','rgba(61,127,255,0.35)'],
+  purple: 'rgba(155,114,255,0.7)',
+  donut:  ['#3d7fff','#9b72ff','#0fd4b8','#f59e0b','#22c77d','#ff4f6a'],
+};
+
+/* ─── HELPER: show a loading shimmer on a KPI value ─── */
+function setKPI(id, value, deltaClass, deltaText) {
+  const card = document.getElementById(id);
+  if (!card) return;
+  card.querySelector('.kpi-value').textContent = value;
+  const d = card.querySelector('.kpi-delta');
+  d.className = 'kpi-delta ' + deltaClass;
+  d.textContent = deltaText;
+}
+
+function fmtDelta(val, type) {
+  if (val === null || val === undefined) return { cls:'neu', txt:'— no data yet' };
+  const abs  = Math.abs(val).toFixed(1);
+  const sign = val > 0 ? '▲' : val < 0 ? '▼' : '—';
+  const cls  = val > 0 ? 'up' : val < 0 ? 'dn' : 'neu';
+  const dir  = val > 0 ? 'up' : 'down';
+  let txt;
+  if (type === 'conversion') {
+    txt = `${sign} ${dir} ${abs}% vs last month`;
+  } else if (type === 'engagement') {
+    txt = `${sign} ${dir} ${abs}% vs last month`;
+  } else {
+    txt = `${sign} ${abs}% vs last month`;
+  }
+  return { cls, txt };
+}
+
+/* ─── BUILD REVENUE + SESSIONS CHART ─── */
+function buildRevChart(labels, revenue, sessions) {
+  const ctx = document.getElementById('revChart');
+  if (revChartInst) revChartInst.destroy();
+  revChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'Revenue ($)', data:revenue, borderColor:'#3d7fff', backgroundColor:'rgba(61,127,255,0.08)', fill:true, tension:0.4, borderWidth:2, pointRadius:0, pointHoverRadius:4, yAxisID:'y' },
+        { label:'Sessions',    data:sessions, borderColor:'#9b72ff', backgroundColor:'transparent', fill:false, tension:0.4, borderWidth:1.5, borderDash:[4,3], pointRadius:0, pointHoverRadius:4, yAxisID:'y1' }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ ...TT, callbacks:{ label: ctx => ctx.dataset.label==='Revenue ($)' ? '$'+ctx.raw.toLocaleString() : ctx.raw+' sessions' } } },
+      scales: {
+        x:  { grid:{color:GRID}, ticks:{color:TICKS, font:{size:11}, maxTicksLimit:8} },
+        y:  { position:'left',  grid:{color:GRID}, ticks:{color:TICKS, font:{size:11}, callback:v=>'$'+(v/1000).toFixed(0)+'K'} },
+        y1: { position:'right', grid:{display:false}, ticks:{color:TICKS, font:{size:11}} }
+      }
+    }
+  });
+}
+
+/* ─── BUILD DONUT CHART ─── */
+function buildDonutChart(sources) {
+  const ctx = document.getElementById('donutChart');
+  if (donutChartInst) donutChartInst.destroy();
+  donutChartInst = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: sources.map(s=>s.name), datasets:[{ data:sources.map(s=>s.pct), backgroundColor:CHART_COLORS.donut, borderWidth:0, hoverOffset:4 }] },
+    options: { responsive:true, maintainAspectRatio:false, cutout:'72%', plugins:{legend:{display:false}, tooltip:TT} }
+  });
+  if (sources.length) {
+    document.querySelector('.donut-val').textContent = sources[0].pct + '%';
+    document.querySelector('.donut-sub').textContent = sources[0].name.toLowerCase();
+  }
+  const EXPLAIN = { 'Organic':'Found you via Google search', 'Direct':'Typed your URL or used a bookmark', 'Referral':'Clicked a link on another website', 'Paid Search':'Clicked a paid ad', 'Email':'Clicked a link in an email', 'Social':'Came from social media', 'Unassigned':'Source could not be identified' };
+  const legend = document.querySelector('.legend-list');
+  legend.innerHTML = sources.slice(0,5).map((s,i) =>
+    `<div class="legend-item" style="align-items:flex-start;gap:9px;margin-bottom:6px;">
+      <div class="legend-swatch" style="background:${CHART_COLORS.donut[i]};margin-top:4px;flex-shrink:0"></div>
+      <div><div style="font-size:12.5px;color:var(--text);font-weight:500;">${s.name} <span style="color:var(--text3);font-weight:400;">${s.pct}%</span></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:1px;">${EXPLAIN[s.name]||'Visited your site'}</div></div>
+    </div>`
+  ).join('');
+}
+
+/* ─── BUILD CATEGORY BAR CHART ─── */
+function buildCatChart(categories) {
+  const ctx = document.getElementById('catChart');
+  if (catChartInst) catChartInst.destroy();
+  // Chart shows top 10 only — trend table shows all 25
+  const chartCats = categories.slice(0, 10);
+  catChartInst = new Chart(ctx, {
+    type:'bar',
+    data: {
+      labels: chartCats.map(c => c.name),
+      datasets:[{ label:'Revenue', data:chartCats.map(c => c.revenue),
+        backgroundColor: CHART_COLORS.blue, borderRadius:5, borderWidth:0 }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{...TT, callbacks:{label:ctx=>'$'+Number(ctx.raw).toLocaleString(undefined,{maximumFractionDigits:0})}}
+      },
+      scales: {
+        x:{ grid:{display:false}, ticks:{color:TICKS, font:{size:10}, maxRotation:30} },
+        y:{ grid:{color:GRID}, ticks:{color:TICKS, font:{size:11}, callback: function(v) {
+          if (v >= 1000000) return '$' + (v/1000000).toFixed(1) + 'M';
+          if (v >= 1000)    return '$' + (v/1000).toFixed(0) + 'K';
+          return '$' + v;
+        }}}
+      }
+    }
+  });
+
+  const trendHTML = categories.map(c => {
+    const cls = c.delta === null ? 'neu' : c.delta >= 0 ? 'up' : 'dn';
+    const txt = c.delta === null ? '— first data' : (c.delta >= 0 ? '+' : '') + c.delta + '%';
+    const rev = c.revenue >= 1000000 ? '$'+(c.revenue/1000000).toFixed(2)+'M' : '$'+(c.revenue/1000).toFixed(1)+'K';
+    return `<div class="trend-row"><div class="trend-label">${c.name}</div><div class="trend-val">${rev}</div><div class="trend-delta ${cls}">${txt}</div></div>`;
+  }).join('');
+
+  const trendContainer = document.getElementById('trend-rows');
+  if (trendContainer) trendContainer.innerHTML = trendHTML;
+  const merchTrend = document.getElementById('merch-trend-rows');
+  if (merchTrend) merchTrend.innerHTML = trendHTML;
+}
+
+/* ─── BUILD SEARCH CHART (uses GSC daily data) ─── */
+function buildSearchChart(labels, data) {
+  const ctx = document.getElementById('searchChart');
+  if (searchChartInst) searchChartInst.destroy();
+  searchChartInst = new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets:[{ label:'Sessions from Search', data, borderColor:'#0fd4b8', backgroundColor:'rgba(15,212,184,0.07)', fill:true, tension:0.4, borderWidth:2, pointRadius:0, pointHoverRadius:4 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:TT},
+      scales:{
+        x:{grid:{color:GRID}, ticks:{color:TICKS, font:{size:11}, maxTicksLimit:8}},
+        y:{grid:{color:GRID}, ticks:{color:TICKS, font:{size:11}}}
+      }
+    }
+  });
+}
+
+/* ─── BUILD SEO SCATTER ─── */
+function buildSeoChart(pages) {
+  const ctx = document.getElementById('seoChart');
+  if (seoChartInst) seoChartInst.destroy();
+  const scatterData = pages.map(p => ({ x: parseFloat((p.impressions/1000).toFixed(1)), y: p.ctr }));
+  seoChartInst = new Chart(ctx, {
+    type:'scatter',
+    data:{ datasets:[{ label:'Pages', data:scatterData,
+      backgroundColor:'rgba(61,127,255,0.65)', borderColor:'rgba(61,127,255,0.9)', pointRadius:8, pointHoverRadius:10 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{...TT, callbacks:{label:ctx=>ctx.raw.x+'K impr · '+ctx.raw.y+'% CTR'}}},
+      scales:{
+        x:{title:{display:true,text:'Impressions (K)',color:TICKS,font:{size:11}}, grid:{color:GRID}, ticks:{color:TICKS,font:{size:11},callback:v=>v+'K'}},
+        y:{title:{display:true,text:'CTR (%)',color:TICKS,font:{size:11}}, grid:{color:GRID}, ticks:{color:TICKS,font:{size:11},callback:v=>v+'%'}}
+      }
+    }
+  });
+}
+
+/* ─── BUILD MERCH CHART ─── */
+function buildMerchChart(products) {
+  const ctx = document.getElementById('merchChart');
+  if (merchChartInst) merchChartInst.destroy();
+  merchChartInst = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: products.map(p => p.sku || p.name.substring(0,12)),
+      datasets:[{ label:'Revenue Last Month', data:products.map(p => p.revenue),
+        backgroundColor:CHART_COLORS.purple, borderRadius:5, borderWidth:0 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{...TT, callbacks:{
+          title: (items) => {
+            const p = products[items[0].dataIndex];
+            return p ? `${p.name} (${p.sku})` : '';
+          },
+          label: ctx=>'$'+Number(ctx.raw).toLocaleString(undefined,{maximumFractionDigits:0})
+        }}
+      },
+      scales:{
+        x:{grid:{display:false}, ticks:{color:TICKS, font:{size:10}, maxRotation:45, minRotation:45}},
+        y:{grid:{color:GRID}, ticks:{color:TICKS, font:{size:11}, callback: v => {
+          if (v>=1000000) return '$'+(v/1000000).toFixed(1)+'M';
+          if (v>=1000)    return '$'+(v/1000).toFixed(0)+'K';
+          return '$'+v;
+        }}}
+      }
+    }
+  });
+}
+
+/* ─── LOAD ALL DATA FROM BACKEND ─── */
+const API = '';
+
+async function loadDashboard() {
+  // Show loading state on everything
+  showLoadingState(`Fetching ${DAYS}-day data...`);
+
+  // Update dynamic period labels
+  const periodLabel = document.getElementById('trend-period-label');
+  const merchLabel  = document.getElementById('merch-products-label');
+  if (periodLabel) periodLabel.textContent = `Category ${DAYS}-Day Trends`;
+  if (merchLabel)  merchLabel.textContent  = `Top Products by Revenue — Last ${DAYS} Days`;
+
+  const aiBody = document.getElementById('ai-body');
+  const oppList = document.getElementById('opp-list');
+  const seoList = document.getElementById('seo-page-list');
+
+  try {
+    // ── Fire all non-AI fetches in parallel ──────────────────────────
+    const [revRes, kpiRes, srcRes, catRes, seoRes, gscRes, vnpRes] = await Promise.all([
+      fetch(API + `/api/ga4/sessions-revenue?days=${DAYS}`),
+      fetch(API + `/api/ga4/kpis`),
+      fetch(API + `/api/ga4/traffic-sources?days=${DAYS}`),
+      fetch(API + `/api/magento/category-revenue?days=${DAYS}`),
+      fetch(API + `/api/gsc/pages?days=${DAYS}&limit=20`),
+      fetch(API + `/api/gsc/summary?days=${DAYS}`),
+      fetch(API + `/api/magento/top-products-last-month?days=${DAYS}`),
+    ]);
+
+    // Revenue + Sessions chart
+    if (revRes.ok) {
+      const { labels, revenue, sessions } = await revRes.json();
+      buildRevChart(labels, revenue, sessions);
+    } else {
+      buildRevChart(L30, wave(30,9000,2200), wave(30,1400,350));
+    }
+
+    // KPI cards
+    if (kpiRes.ok) {
+      const { current, deltas } = await kpiRes.json();
+      const sd = fmtDelta(deltas.sessions, 'sessions');
+      const rd = fmtDelta(deltas.revenue, 'revenue');
+      const cd = fmtDelta(deltas.conversion_rate, 'conversion');
+      const ed = fmtDelta(deltas.engagement_rate, 'engagement');
+      document.getElementById('kpi-sessions').querySelector('.kpi-value').textContent    = current.sessions.toLocaleString();
+      document.getElementById('kpi-sessions').querySelector('.kpi-delta').className      = 'kpi-delta ' + sd.cls;
+      document.getElementById('kpi-sessions').querySelector('.kpi-delta').textContent    = sd.txt;
+      document.getElementById('kpi-revenue').querySelector('.kpi-value').textContent     = '$' + current.revenue.toLocaleString();
+      document.getElementById('kpi-revenue').querySelector('.kpi-delta').className       = 'kpi-delta ' + rd.cls;
+      document.getElementById('kpi-revenue').querySelector('.kpi-delta').textContent     = rd.txt;
+      document.getElementById('kpi-conversion').querySelector('.kpi-value').textContent  = (current.conversion_rate * 100).toFixed(2) + '%';
+      document.getElementById('kpi-conversion').querySelector('.kpi-delta').className    = 'kpi-delta ' + cd.cls;
+      document.getElementById('kpi-conversion').querySelector('.kpi-delta').textContent  = cd.txt;
+      document.getElementById('kpi-engagement').querySelector('.kpi-value').textContent  = current.engagement_rate + '%';
+      document.getElementById('kpi-engagement').querySelector('.kpi-delta').className    = 'kpi-delta ' + ed.cls;
+      document.getElementById('kpi-engagement').querySelector('.kpi-delta').textContent  = ed.txt;
+    }
+
+    // Traffic sources donut
+    if (srcRes.ok) {
+      const { sources } = await srcRes.json();
+      buildDonutChart(sources);
+    } else {
+      buildDonutChart([{name:'Organic',pct:48},{name:'Direct',pct:22},{name:'Referral',pct:18},{name:'Paid',pct:12}]);
+    }
+
+    // Category revenue chart + trend rows + merch KPIs
+    if (catRes.ok) {
+      const { categories } = await catRes.json();
+      buildCatChart(categories);
+      // Populate merch KPI cards from real data
+      if (categories.length) {
+        const top = categories[0];
+        const rev = top.revenue >= 1000000 ? '$'+(top.revenue/1000000).toFixed(2)+'M' : '$'+(top.revenue/1000).toFixed(1)+'K';
+        const el = document.getElementById('kpi-merch-topcategory');
+        if (el) {
+          el.querySelector('.kpi-value').textContent = rev;
+          const d = top.delta;
+          const deltaEl = el.querySelector('.kpi-delta');
+          deltaEl.className = 'kpi-delta ' + (d===null?'neu':d>=0?'up':'dn');
+          deltaEl.textContent = d===null ? top.name : `${d>=0?'▲':'▼'} ${Math.abs(d)}% · ${top.name}`;
+        }
+        const countEl = document.getElementById('kpi-merch-categories');
+        if (countEl) {
+          countEl.querySelector('.kpi-value').textContent = categories.length;
+        }
+      }
+    } else {
+      buildCatChart([{name:'DP3 Series',revenue:92410,delta:null}]);
+    }
+
+    // SEO pages scatter + list + KPI
+    if (seoRes.ok) {
+      const { pages, low_ctr_count } = await seoRes.json();
+      buildSeoChart(pages);
+      renderSeoPageList(pages);
+      document.getElementById('kpi-low-ctr').querySelector('.kpi-value').textContent = low_ctr_count;
+    } else {
+      buildSeoChart([{impressions:48200,ctr:0.9},{impressions:39100,ctr:1.4}]);
+    }
+
+    // GSC summary KPIs
+    if (gscRes.ok) {
+      const { impressions, ctr, position } = await gscRes.json();
+      document.getElementById('kpi-impressions').querySelector('.kpi-value').textContent = (impressions/1000000).toFixed(2) + 'M';
+      document.getElementById('kpi-position').querySelector('.kpi-value').textContent    = position;
+      document.getElementById('kpi-ctr').querySelector('.kpi-value').textContent         = ctr + '%';
+    }
+
+    // Restore chart opacity now that data is loaded
+    hideLoadingState();
+
+    // Search trend chart (reuses rev fetch data — same endpoint)
+    if (revRes.ok) {
+      const { labels, sessions } = await (await fetch(API + `/api/ga4/sessions-revenue?days=${DAYS}`)).json().catch(()=>({labels:L30,sessions:wave(30,620,140)}));
+      buildSearchChart(labels, sessions);
+    }
+
+    // Merch top products
+    if (vnpRes.ok) {
+      const { products } = await vnpRes.json();
+      buildMerchChart(products);
+      if (products.length) {
+        const top = products[0];
+        const rev = top.revenue >= 1000000 ? '$'+(top.revenue/1000000).toFixed(2)+'M' : '$'+(top.revenue/1000).toFixed(1)+'K';
+        const el = document.getElementById('kpi-merch-topproduct');
+        if (el) {
+          el.querySelector('.kpi-value').textContent = top.sku || top.name.substring(0,10);
+          el.querySelector('.kpi-delta').textContent = rev + ' last month';
+          el.querySelector('.kpi-delta').className = 'kpi-delta up';
+        }
+      }
+    }
+
+    // Dormant top sellers count
+    fetch(API + '/api/magento/dormant-top-sellers').then(r => r.json()).then(d => {
+      const el = document.getElementById('kpi-merch-dormant');
+      if (el && d.products) {
+        el.querySelector('.kpi-value').textContent = d.products.length;
+        el.querySelector('.kpi-delta').className = d.products.length > 0 ? 'kpi-delta dn' : 'kpi-delta neu';
+      }
+    }).catch(()=>{});
+
+    // ── Fire AI calls after charts are rendered (these are slow) ─────
+    // Opportunities and AI summary run in parallel but don't block charts
+    Promise.all([
+      fetch(API + `/api/opportunities?days=${DAYS}`),
+      fetch(API + `/api/ai/summary?days=${DAYS}`),
+    ]).then(async ([oppRes2, aiRes]) => {
+      if (oppRes2.ok) renderOpportunities(await oppRes2.json());
+      else if (oppList) oppList.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">Could not load opportunities.</div>';
+
+      if (aiRes.ok) renderAiSummary(await aiRes.json());
+      else if (aiBody) aiBody.innerHTML = '<div style="color:var(--text3);font-size:13px;">Could not load AI summary.</div>';
+    }).catch(() => {
+      if (oppList) oppList.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">Could not load opportunities.</div>';
+      if (aiBody)  aiBody.innerHTML  = '<div style="color:var(--text3);font-size:13px;">Could not load AI summary.</div>';
+    });
+
+  } catch (err) {
+    console.warn('Backend not reachable — using mock data.', err);
+    buildRevChart(L30, wave(30,9000,2200), wave(30,1400,350));
+    buildDonutChart([{name:'Organic',pct:48},{name:'Direct',pct:22},{name:'Referral',pct:18},{name:'Paid',pct:12}]);
+    buildCatChart([{name:'DP3 Series',revenue:92410,delta:null}]);
+    buildSearchChart(L30, wave(30,620,140));
+    buildSeoChart([{impressions:48200,ctr:0.9},{impressions:39100,ctr:1.4}]);
+  }
+}
+
+/* ─── RENDER SEO PAGE LIST ─── */
+function renderSeoPageList(pages) {
+  const el = document.getElementById('seo-page-list');
+  if (!el) return;
+  const top = pages.slice(0, 8);
+  const maxImpr = Math.max(...top.map(p => p.impressions), 1);
+  el.innerHTML = top.map((p, i) => {
+    const path  = p.url.replace('https://www.mockett.com','').replace('https://mockett.com','') || '/';
+    const imprK = p.impressions >= 1000 ? (p.impressions/1000).toFixed(1)+'K' : p.impressions;
+    const barW  = Math.round((p.impressions / maxImpr) * 100);
+    const ctrColor = p.ctr < 1.0 ? 'var(--red)' : p.ctr < 2.5 ? 'var(--amber)' : 'var(--green)';
+    return `<div class="seo-row">
+      <div class="seo-rank">${String(i+1).padStart(2,'0')}</div>
+      <div class="seo-page" title="${path}"><strong>${path}</strong></div>
+      <div class="seo-impr">${imprK}</div>
+      <div class="ctr-track"><div class="ctr-fill" style="width:${barW}%;background:${ctrColor}"></div></div>
+      <div class="seo-ctr" style="color:${ctrColor}">${p.ctr}%</div>
+    </div>`;
+  }).join('');
+}
+
+/* ─── RENDER OPPORTUNITIES ─── */
+function renderOpportunities(data) {
+  const list = document.getElementById('opp-list');
+  if (!list) return;
+  const items = data.opportunities || [];
+  if (!items.length) {
+    list.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">No significant opportunities detected in current data.</div>';
+    return;
+  }
+  const BG = { high:'rgba(255,79,106,0.1)', med:'rgba(245,158,11,0.1)', low:'rgba(34,199,125,0.1)' };
+  list.innerHTML = items.map(o => `
+    <div class="opp-card">
+      <div class="opp-icon" style="background:${BG[o.priority]||BG.low}">${o.icon||'📊'}</div>
+      <div class="opp-content">
+        <div class="opp-title">${o.title}</div>
+        <div class="opp-desc">${o.desc} · <span style="font-family:var(--mono);font-size:11px;color:var(--accent2)">${o.action}</span></div>
+      </div>
+      <div class="priority-tag ${o.priority}">${o.priority==='med'?'Medium':o.priority.charAt(0).toUpperCase()+o.priority.slice(1)}</div>
+    </div>
+  `).join('');
+}
+
+/* ─── RENDER AI SUMMARY ─── */
+function renderAiSummary(data) {
+  const ICONS = { positive:'✅', warning:'📈', alert:'⚠️', info:'🔍' };
+  const ICON_CLASS = { positive:'positive', warning:'warning', alert:'alert', info:'info' };
+
+  const body = document.getElementById('ai-body');
+  const time = document.getElementById('ai-generated-time');
+
+  if (time && data.generated_at) {
+    const d = new Date(data.generated_at);
+    time.textContent = 'Generated ' + d.toLocaleTimeString() + ' · GPT-4.1-mini';
+  }
+
+  if (!body || !data.insights) return;
+
+  body.innerHTML = data.insights.map((ins, i) => `
+    ${i > 0 ? '<hr class="ai-divider">' : ''}
+    <div class="ai-insight">
+      <div class="ai-insight-icon ${ICON_CLASS[ins.type] || 'info'}">${ICONS[ins.type] || '🔍'}</div>
+      <div class="ai-insight-content">
+        <div class="ai-insight-title">${ins.title}</div>
+        <div class="ai-insight-desc">${ins.description}</div>
+        ${ins.action ? `<div class="action-chips"><span class="action-chip">${ins.action}</span></div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+// Kick it all off
+loadDashboard();
+</script>
+</body>
+</html>

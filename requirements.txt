@@ -1,0 +1,8 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-dotenv==1.0.1
+google-analytics-data==0.18.9
+google-auth==2.29.0
+google-api-python-client==2.127.0
+pyodbc==5.1.0
+PyMySQL==1.1.1
