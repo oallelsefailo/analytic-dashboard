@@ -1532,9 +1532,18 @@ async function loadDashboard() {
       }
     }).catch(()=>{});
 
-    // ── Fire AI calls ONLY when on those pages (see nav function) ───
-    // AI Summary and Opportunities are NOT fetched here to avoid
-    // unnecessary OpenAI charges on every date change.
+    // If already on AI or Opps page, re-fetch with new date range
+    const currentPage = document.querySelector('.page.active');
+    if (currentPage && currentPage.id === 'page-ai') {
+      aiLoadedForDays = null;
+      const fakeEl = document.querySelector('.nav-item[onclick*="ai"]');
+      if (fakeEl) nav('ai', fakeEl);
+    }
+    if (currentPage && currentPage.id === 'page-opps') {
+      oppsLoadedForDays = null;
+      const fakeEl = document.querySelector('.nav-item[onclick*="opps"]');
+      if (fakeEl) nav('opps', fakeEl);
+    }
 
   } catch (err) {
     console.warn('Backend not reachable — using mock data.', err);
