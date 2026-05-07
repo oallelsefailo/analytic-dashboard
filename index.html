@@ -302,7 +302,7 @@
   .page.active { display: flex; flex-direction: column; gap: 22px; }
 
   /* ─── GRIDS ─── */
-  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; align-items: start; }
   .two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .wide-col  { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
 
@@ -1464,7 +1464,7 @@ async function loadDashboard() {
       document.getElementById('kpi-revenue').querySelector('.kpi-value').textContent     = '$' + current.revenue.toLocaleString();
       document.getElementById('kpi-revenue').querySelector('.kpi-delta').className       = 'kpi-delta ' + rd.cls;
       document.getElementById('kpi-revenue').querySelector('.kpi-delta').textContent     = rd.txt;
-      document.getElementById('kpi-conversion').querySelector('.kpi-value').textContent  = (current.conversion_rate * 100).toFixed(2) + '%';
+      document.getElementById('kpi-conversion').querySelector('.kpi-value').textContent  = Number(current.conversion_rate).toFixed(2) + '%';
       document.getElementById('kpi-conversion').querySelector('.kpi-delta').className    = 'kpi-delta ' + cd.cls;
       document.getElementById('kpi-conversion').querySelector('.kpi-delta').textContent  = cd.txt;
       document.getElementById('kpi-engagement').querySelector('.kpi-value').textContent  = current.engagement_rate + '%';
