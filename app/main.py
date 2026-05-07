@@ -566,15 +566,28 @@ def ai_summary(days: int = 30):
         # Build prompt from only available data
         sections = []
         if metrics["ga4"]:
-            sections.append(f"GA4 — LAST 30 DAYS VS PRIOR 30 DAYS:\n{json.dumps(metrics['ga4'], indent=2)}")
+            sections.append(f"GA4 — LAST {days} DAYS VS PRIOR {days} DAYS:\n{json.dumps(metrics['ga4'], indent=2)}")
         if metrics["gsc"]:
-            sections.append(f"GOOGLE SEARCH CONSOLE — LAST 30 DAYS:\n{json.dumps(metrics['gsc'], indent=2)}")
+            sections.append(f"GOOGLE SEARCH CONSOLE — LAST {days} DAYS:\n{json.dumps(metrics['gsc'], indent=2)}")
         if metrics["categories"]:
             sections.append(f"TOP CATEGORIES BY REVENUE:\n{json.dumps(metrics['categories'], indent=2)}")
         if metrics["top_products"]:
             sections.append(f"TOP PRODUCTS LAST MONTH:\n{json.dumps(metrics['top_products'], indent=2)}")
         if metrics["low_ctr_pages"]:
-            sections.append(f"PAGES WITH HIGH IMPRESSIONS BUT LOW CTR (SEO opportunities):\n{json.dumps(metrics['low_ctr_pages'], indent=2)}")
+            sections.append(f"PAGES WITH HIGH IMPRESSIONS BUT LOW CTR:\n{json.dumps(metrics['low_ctr_pages'], indent=2)}")
+
+        # If no data at all, return a friendly message without calling OpenAI
+        if not sections:
+            return {
+                "insights": [{
+                    "title": "Data sources unavailable",
+                    "type": "info",
+                    "description": "GA4, Search Console, and Magento data could not be retrieved for this period. Please check your data source connections and try again.",
+                    "action": "review_category_navigation"
+                }],
+                "generated_at": datetime.now().isoformat(),
+                "data_snapshot": {"sessions": None, "revenue": None, "impressions": None, "ctr": None}
+            }
 
         prompt = f"""You are a business intelligence assistant for Mockett.com, which sells office hardware (grommets, power solutions, drawer pulls, cable management).
 
