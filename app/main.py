@@ -75,7 +75,7 @@ def get_magento_conn():
         host=os.getenv("MYSQL_HOST"), port=int(os.getenv("MYSQL_PORT", 3306)),
         user=os.getenv("MYSQL_USER"), password=os.getenv("MYSQL_PASSWORD"),
         database=os.getenv("MYSQL_DB"), cursorclass=pymysql.cursors.DictCursor,
-        connect_timeout=10,
+        connect_timeout=5,
     )
 
 def get_openai():
@@ -546,22 +546,17 @@ def ai_summary(days: int = 30):
             metrics["gsc"] = None
 
         try:
-            metrics["categories"] = magento_category_revenue(days=days)["categories"][:6]
-        except:
-            metrics["categories"] = None
-
-        try:
-            metrics["top_products"] = magento_top_products_last_month()["products"][:5]
-        except:
-            metrics["top_products"] = None
-
-        try:
             gsc_opps = gsc_pages(days=days, limit=20)
             metrics["low_ctr_pages"] = [
                 p for p in gsc_opps["pages"] if p["impressions"] > 5000 and p["ctr"] < 2.0
             ][:3]
         except:
             metrics["low_ctr_pages"] = None
+
+        # Skip Magento in AI summary — connection currently unavailable
+        # Will re-enable once Rackspace firewall is resolved
+        metrics["categories"] = None
+        metrics["top_products"] = None
 
         # Build prompt from only available data
         sections = []
