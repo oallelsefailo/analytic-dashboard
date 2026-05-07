@@ -553,10 +553,15 @@ def ai_summary(days: int = 30):
         except:
             metrics["low_ctr_pages"] = None
 
-        # Skip Magento in AI summary — connection currently unavailable
-        # Will re-enable once Rackspace firewall is resolved
-        metrics["categories"] = None
-        metrics["top_products"] = None
+        try:
+            metrics["categories"] = magento_category_revenue(days=days)["categories"][:6]
+        except:
+            metrics["categories"] = None
+
+        try:
+            metrics["top_products"] = magento_top_products_last_month(days=days)["products"][:5]
+        except:
+            metrics["top_products"] = None
 
         # Build prompt from only available data
         sections = []

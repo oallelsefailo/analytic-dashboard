@@ -1132,10 +1132,19 @@ function nav(id, el) {
     aiLoadedForDays = DAYS;
     const aiBody = document.getElementById('ai-body');
     if (aiBody) aiBody.innerHTML = '<div class="spinner"><div class="spinner-ring"></div>Generating summary — takes a few seconds...</div>';
-    fetch(API + `/api/ai/summary?days=${DAYS}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) renderAiSummary(d); else if (aiBody) aiBody.innerHTML = '<div style="color:var(--text3);font-size:13px;">Could not load AI summary.</div>'; })
-      .catch(() => { if (aiBody) aiBody.innerHTML = '<div style="color:var(--text3);font-size:13px;">Could not load AI summary.</div>'; });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+    fetch(API + `/api/ai/summary?days=${DAYS}`, { signal: controller.signal })
+      .then(r => { clearTimeout(timeout); return r.ok ? r.json() : null; })
+      .then(d => {
+        if (d) renderAiSummary(d);
+        else if (aiBody) aiBody.innerHTML = '<div style="color:var(--text3);font-size:13px;">Could not load AI summary.</div>';
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        if (aiBody) aiBody.innerHTML = '<div style="color:var(--text3);font-size:13px;">AI summary timed out. Try again.</div>';
+        aiLoadedForDays = null; // Allow retry
+      });
   }
 
   // Lazy-load opportunities only when navigating to opportunities page
