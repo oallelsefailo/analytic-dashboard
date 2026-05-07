@@ -942,6 +942,16 @@
           </div>
         </div>
       </div>
+
+      <!-- Dormant top sellers detail panel -->
+      <div class="panel" id="dormant-panel" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title"><div class="dot red"></div>Dormant Top Sellers — Strong Last Month, Zero Orders This Month</div>
+          <span class="panel-tag blue">Magento</span>
+        </div>
+        <div class="panel-body" id="dormant-list">
+        </div>
+      </div>
     </div>
 
     <!-- ══════════════════════════════════════
@@ -1523,12 +1533,32 @@ async function loadDashboard() {
       }
     }
 
-    // Dormant top sellers count
+    // Dormant top sellers count + detail panel
     fetch(API + '/api/magento/dormant-top-sellers').then(r => r.json()).then(d => {
       const el = document.getElementById('kpi-merch-dormant');
+      const panel = document.getElementById('dormant-panel');
+      const list  = document.getElementById('dormant-list');
       if (el && d.products) {
-        el.querySelector('.kpi-value').textContent = d.products.length;
-        el.querySelector('.kpi-delta').className = d.products.length > 0 ? 'kpi-delta dn' : 'kpi-delta neu';
+        const count = d.products.length;
+        el.querySelector('.kpi-value').textContent = count;
+        el.querySelector('.kpi-delta').className = count > 0 ? 'kpi-delta dn' : 'kpi-delta neu';
+
+        if (count > 0 && panel && list) {
+          panel.style.display = 'block';
+          list.innerHTML = d.products.map(p => {
+            const rev = p.revenue_last_month >= 1000
+              ? '$' + (p.revenue_last_month/1000).toFixed(1) + 'K'
+              : '$' + p.revenue_last_month.toFixed(0);
+            return `<div class="trend-row">
+              <div class="trend-label" style="font-family:var(--mono);font-size:12px;">${p.sku}</div>
+              <div style="flex:2;font-size:12.5px;color:var(--text2);padding:0 12px;">${p.name}</div>
+              <div class="trend-val">${rev} last mo.</div>
+              <div class="trend-delta dn">0 orders</div>
+            </div>`;
+          }).join('');
+        } else if (panel) {
+          panel.style.display = 'none';
+        }
       }
     }).catch(()=>{});
 
