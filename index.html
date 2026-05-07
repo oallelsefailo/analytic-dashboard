@@ -198,36 +198,6 @@
   }
 
   /* ─── FULL SCREEN LOADING OVERLAY ─── */
-  .page-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    z-index: 999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 14px;
-    backdrop-filter: blur(2px);
-  }
-
-  body.light .page-overlay { background: rgba(255,255,255,0.6); }
-
-  .page-overlay-ring {
-    width: 48px; height: 48px;
-    border-radius: 50%;
-    border: 4px solid var(--border2);
-    border-top-color: var(--accent2);
-    animation: spin 0.75s linear infinite;
-  }
-
-  .page-overlay-text {
-    font-size: 13px;
-    color: var(--text2);
-    font-weight: 500;
-  }
-
-  /* ─── FULL SCREEN LOADING OVERLAY ─── */
   .loading-overlay {
     position: fixed;
     inset: 0;
@@ -303,7 +273,6 @@
 
   /* ─── GRIDS ─── */
   .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-  .kpi-card { min-height: unset; }
   .two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .wide-col  { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
 
@@ -679,11 +648,6 @@
 
   <!-- ═══ MAIN ═══ -->
   <main class="main">
-    <!-- Loading overlay -->
-    <div class="page-overlay" id="page-overlay" style="display:none">
-      <div class="page-overlay-ring"></div>
-      <div class="page-overlay-text">Loading data...</div>
-    </div>
 
     <!-- TOP BAR -->
     <div class="topbar">
