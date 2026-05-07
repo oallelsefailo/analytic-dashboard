@@ -653,7 +653,7 @@
     <div class="topbar">
       <div class="topbar-left">
         <div class="page-title" id="page-title">Executive Overview</div>
-        <div class="page-sub" id="page-sub">All data sources synced · Last updated 4 min ago</div>
+        <div class="page-sub" id="page-sub">GA4, Search Console, and Magento · Live dashboard data</div>
       </div>
       <div class="topbar-right">
 
@@ -672,8 +672,8 @@
           <div class="drp-option" onclick="setDays(7,  'Last 7 Days')">Last 7 Days</div>
           <div class="drp-option" onclick="setDays(14, 'Last 14 Days')">Last 14 Days</div>
           <div class="drp-option active" onclick="setDays(30, 'Last 30 Days')">Last 30 Days</div>
-          <div class="drp-option" onclick="setDays(90, 'Last Quarter')">Last Quarter (90 days)</div>
-          <div class="drp-option" onclick="setDays(270,'Last 3 Quarters')">Last 3 Quarters</div>
+          <div class="drp-option" onclick="setDays(90, 'Last 90 Days')">Last 90 Days</div>
+          <div class="drp-option" onclick="setDays(270,'Last 270 Days')">Last 270 Days</div>
           <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
           <div style="padding:8px 16px;">
             <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Custom range</div>
@@ -718,7 +718,7 @@
             <div class="kpi-icon blue">💰</div>
           </div>
           <div class="kpi-value">$284,920</div>
-          <div class="kpi-delta up">▲ 12.4% vs last month</div>
+          <div class="kpi-delta up">▲ 12.4% vs prior period</div>
         </div>
         <div class="kpi-card green" id="kpi-sessions" title="Total number of visits to the website. One session = one visit, regardless of how many pages were viewed.">
           <div class="kpi-header">
@@ -726,7 +726,7 @@
             <div class="kpi-icon green">👥</div>
           </div>
           <div class="kpi-value">41,882</div>
-          <div class="kpi-delta up">▲ 8.1% vs last month</div>
+          <div class="kpi-delta up">▲ 8.1% vs prior period</div>
         </div>
         <div class="kpi-card red" id="kpi-conversion" title="Out of every 100 visitors, how many placed an order. Higher is better. Industry average for B2B is 1-3%.">
           <div class="kpi-header">
@@ -734,7 +734,7 @@
             <div class="kpi-icon red">🎯</div>
           </div>
           <div class="kpi-value">2.31%</div>
-          <div class="kpi-delta dn">▼ down vs last month</div>
+          <div class="kpi-delta dn">▼ down vs prior period</div>
         </div>
         <div class="kpi-card purple" id="kpi-engagement" title="Percentage of visitors who actively engaged with the site — scrolled, clicked, or spent 10+ seconds on a page. Higher means visitors found what they were looking for.">
           <div class="kpi-header">
@@ -742,7 +742,7 @@
             <div class="kpi-icon purple">🔍</div>
           </div>
           <div class="kpi-value">63.4%</div>
-          <div class="kpi-delta neu">— flat vs last month</div>
+          <div class="kpi-delta neu">— flat vs prior period</div>
         </div>
       </div>
 
@@ -909,10 +909,10 @@
           <div class="kpi-value">—</div>
           <div class="kpi-delta neu">Loading...</div>
         </div>
-        <div class="kpi-card red" id="kpi-merch-dormant" title="Products that were top sellers last month but have zero orders so far this month. Could indicate stock issues, visibility problems, or seasonal shifts.">
-          <div class="kpi-header"><div class="kpi-label">Dormant Top Sellers</div><div class="kpi-icon red">⚠️</div></div>
+        <div class="kpi-card red" id="kpi-merch-dropoffs" title="Products with strong revenue in the prior equivalent period that declined during the selected period.">
+          <div class="kpi-header"><div class="kpi-label">Product Drop-Offs</div><div class="kpi-icon red">⚠️</div></div>
           <div class="kpi-value">—</div>
-          <div class="kpi-delta neu">Strong last month, 0 orders this month</div>
+          <div class="kpi-delta neu">Vs prior equivalent period</div>
         </div>
         <div class="kpi-card purple" id="kpi-merch-categories" title="Total number of product categories with revenue recorded in Magento for the selected period.">
           <div class="kpi-header"><div class="kpi-label">Categories Tracked</div><div class="kpi-icon purple">🗂</div></div>
@@ -924,7 +924,7 @@
       <div class="two-col">
         <div class="panel">
           <div class="panel-header">
-            <div class="panel-title"><div class="dot blue"></div><span id="merch-products-label">Top Products by Revenue — Last Month</span></div>
+            <div class="panel-title"><div class="dot blue"></div><span id="merch-products-label">Top Products by Revenue — Last 30 Days</span></div>
             <span class="panel-tag blue">Magento</span>
           </div>
           <div class="panel-body">
@@ -943,13 +943,13 @@
         </div>
       </div>
 
-      <!-- Dormant top sellers detail panel -->
-      <div class="panel" id="dormant-panel" style="display:none">
+      <!-- Product drop-offs detail panel -->
+      <div class="panel" id="product-dropoff-panel" style="display:none">
         <div class="panel-header">
-          <div class="panel-title"><div class="dot red"></div>Dormant Top Sellers — Strong Last Month, Zero Orders This Month</div>
+          <div class="panel-title"><div class="dot red"></div><span id="product-dropoff-label">Product Drop-Offs — Previous Period vs Selected Range</span></div>
           <span class="panel-tag blue">Magento</span>
         </div>
-        <div class="panel-body" id="dormant-list">
+        <div class="panel-body" id="product-dropoff-list">
         </div>
       </div>
     </div>
@@ -1030,6 +1030,45 @@ if (localStorage.getItem('theme') === 'light') {
 
 /* ─── DATE RANGE PICKER ─── */
 let DAYS = 30;
+let PERIOD_LABEL = 'Last 30 Days';
+let CUSTOM_START = null;
+let CUSTOM_END = null;
+
+function currentPeriodLabel() {
+  return CUSTOM_START && CUSTOM_END ? document.getElementById('drp-label').textContent : PERIOD_LABEL;
+}
+
+function apiParams() {
+  const params = new URLSearchParams({ days: String(DAYS), period_label: currentPeriodLabel() });
+  if (CUSTOM_START && CUSTOM_END) {
+    params.set('start_date', CUSTOM_START);
+    params.set('end_date', CUSTOM_END);
+  }
+  return params.toString();
+}
+
+function comparisonText() {
+  return CUSTOM_START && CUSTOM_END ? `vs prior ${DAYS}-day period` : `vs prior ${DAYS} days`;
+}
+
+function parseDateInput(value) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatDateInput(value) {
+  return parseDateInput(value).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
 
 function toggleDatePicker() {
   const dd = document.getElementById('drp-dropdown');
@@ -1038,10 +1077,13 @@ function toggleDatePicker() {
 
 function setDays(days, label) {
   DAYS = days;
+  PERIOD_LABEL = label;
+  CUSTOM_START = null;
+  CUSTOM_END = null;
   document.getElementById('drp-label').textContent = label;
   document.getElementById('drp-dropdown').style.display = 'none';
   document.querySelectorAll('.drp-option').forEach(o => o.classList.remove('active'));
-  event.target.classList.add('active');
+  if (typeof event !== 'undefined' && event.target) event.target.classList.add('active');
   // Reset lazy-load trackers so AI/opps re-fetch with new date if visited
   aiLoadedForDays   = null;
   oppsLoadedForDays = null;
@@ -1084,16 +1126,18 @@ function applyCustomRange() {
   const start = document.getElementById('drp-start').value;
   const end   = document.getElementById('drp-end').value;
   if (!start || !end) { alert('Please select both a start and end date.'); return; }
-  if (start >= end)   { alert('Start date must be before end date.'); return; }
+  if (start > end)    { alert('Start date must be before or equal to end date.'); return; }
 
-  const ms   = new Date(end) - new Date(start);
-  const days = Math.round(ms / (1000 * 60 * 60 * 24));
+  const ms   = parseDateInput(end) - parseDateInput(start);
+  const days = Math.round(ms / (1000 * 60 * 60 * 24)) + 1;
 
   if (days > 500) { alert('Custom range cannot exceed 500 days.'); return; }
 
   DAYS = days;
-  const fmt = d => new Date(d).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
-  document.getElementById('drp-label').textContent = `${fmt(start)} – ${fmt(end)}`;
+  PERIOD_LABEL = 'Custom Range';
+  CUSTOM_START = start;
+  CUSTOM_END = end;
+  document.getElementById('drp-label').textContent = `${formatDateInput(start)} – ${formatDateInput(end)}`;
   document.getElementById('drp-dropdown').style.display = 'none';
   document.querySelectorAll('.drp-option').forEach(o => o.classList.remove('active'));
   aiLoadedForDays   = null;
@@ -1117,11 +1161,11 @@ function printAiSummary() {
 
 /* ─── NAVIGATION ─── */
 const PAGES = {
-  overview: { title: 'Executive Overview',      sub: 'All data sources synced · Last updated 4 min ago' },
+  overview: { title: 'Executive Overview',      sub: 'GA4, Search Console, and Magento · Live dashboard data' },
   search:   { title: 'Search Intelligence',     sub: 'Clean search logger · Bot-filtered · 30-day window' },
   seo:      { title: 'SEO Performance',         sub: 'Google Search Console + GA4 · Impressions & CTR' },
   merch:    { title: 'Merchandising',           sub: 'Magento product & category engagement' },
-  ai:       { title: 'AI Summary Panel',        sub: 'GPT-4.1 executive brief · Constrained recommendations' },
+  ai:       { title: 'AI Summary Panel',        sub: 'GPT-4.1-mini executive brief · Constrained recommendations' },
   opps:     { title: 'Opportunities',           sub: 'AI-detected · Ranked by estimated impact' }
 };
 
@@ -1144,7 +1188,7 @@ function nav(id, el) {
     if (aiBody) aiBody.innerHTML = '<div class="spinner"><div class="spinner-ring"></div>Generating summary — takes a few seconds...</div>';
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-    fetch(API + `/api/ai/summary?days=${DAYS}`, { signal: controller.signal })
+    fetch(API + `/api/ai/summary?${apiParams()}`, { signal: controller.signal })
       .then(r => { clearTimeout(timeout); return r.ok ? r.json() : null; })
       .then(d => {
         if (d) renderAiSummary(d);
@@ -1162,7 +1206,7 @@ function nav(id, el) {
     oppsLoadedForDays = DAYS;
     const oppList = document.getElementById('opp-list');
     if (oppList) oppList.innerHTML = '<div class="spinner"><div class="spinner-ring"></div>Analyzing data for opportunities...</div>';
-    fetch(API + `/api/opportunities?days=${DAYS}`)
+    fetch(API + `/api/opportunities?${apiParams()}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) renderOpportunities(d); else if (oppList) oppList.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">Could not load opportunities.</div>'; })
       .catch(() => { if (oppList) oppList.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">Could not load opportunities.</div>'; });
@@ -1212,7 +1256,7 @@ function fmtDelta(val, type) {
   const sign = val > 0 ? '▲' : val < 0 ? '▼' : '—';
   const cls  = val > 0 ? 'up' : val < 0 ? 'dn' : 'neu';
   const dir  = val > 0 ? 'up' : 'down';
-  const period = `vs prior ${DAYS} days`;
+  const period = comparisonText();
   let txt;
   if (type === 'conversion' || type === 'engagement') {
     txt = `${sign} ${dir} ${abs}% ${period}`;
@@ -1265,8 +1309,8 @@ function buildDonutChart(sources) {
   legend.innerHTML = sources.slice(0,5).map((s,i) =>
     `<div class="legend-item" style="align-items:flex-start;gap:9px;margin-bottom:6px;">
       <div class="legend-swatch" style="background:${CHART_COLORS.donut[i]};margin-top:4px;flex-shrink:0"></div>
-      <div><div style="font-size:12.5px;color:var(--text);font-weight:500;">${s.name} <span style="color:var(--text3);font-weight:400;">${s.pct}%</span></div>
-      <div style="font-size:11px;color:var(--text3);margin-top:1px;">${EXPLAIN[s.name]||'Visited your site'}</div></div>
+      <div><div style="font-size:12.5px;color:var(--text);font-weight:500;">${escapeHTML(s.name)} <span style="color:var(--text3);font-weight:400;">${s.pct}%</span></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:1px;">${escapeHTML(EXPLAIN[s.name]||'Visited your site')}</div></div>
     </div>`
   ).join('');
 }
@@ -1305,7 +1349,7 @@ function buildCatChart(categories) {
     const cls = c.delta === null ? 'neu' : c.delta >= 0 ? 'up' : 'dn';
     const txt = c.delta === null ? '— first data' : (c.delta >= 0 ? '+' : '') + c.delta + '%';
     const rev = c.revenue >= 1000000 ? '$'+(c.revenue/1000000).toFixed(2)+'M' : '$'+(c.revenue/1000).toFixed(1)+'K';
-    return `<div class="trend-row"><div class="trend-label">${c.name}</div><div class="trend-val">${rev}</div><div class="trend-delta ${cls}">${txt}</div></div>`;
+    return `<div class="trend-row"><div class="trend-label">${escapeHTML(c.name)}</div><div class="trend-val">${rev}</div><div class="trend-delta ${cls}">${txt}</div></div>`;
   }).join('');
 
   const trendContainer = document.getElementById('trend-rows');
@@ -1370,7 +1414,7 @@ function buildMerchChart(products) {
     type:'bar',
     data:{
       labels: products.map(p => p.sku || p.name.substring(0,12)),
-      datasets:[{ label:'Revenue Last Month', data:products.map(p => p.revenue),
+      datasets:[{ label:'Revenue Selected Period', data:products.map(p => p.revenue),
         backgroundColor:CHART_COLORS.purple, borderRadius:5, borderWidth:0 }]
     },
     options:{
@@ -1402,15 +1446,17 @@ const API = '';
 
 async function loadDashboard() {
   // Show loading state on everything
-  showLoadingState(`Fetching ${DAYS}-day data...`);
+  showLoadingState(`Fetching ${currentPeriodLabel()} data...`);
 
   // Update dynamic period labels
   const periodLabel  = document.getElementById('trend-period-label');
   const merchLabel   = document.getElementById('merch-products-label');
   const revLabel     = document.getElementById('rev-chart-label');
-  if (periodLabel) periodLabel.textContent = `Category ${DAYS}-Day Trends`;
-  if (merchLabel)  merchLabel.textContent  = `Top Products by Revenue — Last ${DAYS} Days`;
-  if (revLabel)    revLabel.textContent    = `Revenue & Sessions — ${DAYS} Days`;
+  const dropoffLabel = document.getElementById('product-dropoff-label');
+  if (periodLabel) periodLabel.textContent = `Category Trends — ${currentPeriodLabel()}`;
+  if (merchLabel)  merchLabel.textContent  = `Top Products by Revenue — ${currentPeriodLabel()}`;
+  if (revLabel)    revLabel.textContent    = `Revenue & Sessions — ${currentPeriodLabel()}`;
+  if (dropoffLabel) dropoffLabel.textContent = `Product Drop-Offs — ${comparisonText()}`;
 
   const aiBody = document.getElementById('ai-body');
   const oppList = document.getElementById('opp-list');
@@ -1418,14 +1464,16 @@ async function loadDashboard() {
 
   try {
     // ── Fire all non-AI fetches in parallel ──────────────────────────
-    const [revRes, kpiRes, srcRes, catRes, seoRes, gscRes, vnpRes] = await Promise.all([
-      fetch(API + `/api/ga4/sessions-revenue?days=${DAYS}`),
-      fetch(API + `/api/ga4/kpis?days=${DAYS}`),
-      fetch(API + `/api/ga4/traffic-sources?days=${DAYS}`),
-      fetch(API + `/api/magento/category-revenue?days=${DAYS}`),
-      fetch(API + `/api/gsc/pages?days=${DAYS}&limit=20`),
-      fetch(API + `/api/gsc/summary?days=${DAYS}`),
-      fetch(API + `/api/magento/top-products-last-month?days=${DAYS}`),
+    const params = apiParams();
+    const [revRes, kpiRes, srcRes, catRes, seoRes, gscRes, vnpRes, dropoffRes] = await Promise.all([
+      fetch(API + `/api/ga4/sessions-revenue?${params}`),
+      fetch(API + `/api/ga4/kpis?${params}`),
+      fetch(API + `/api/ga4/traffic-sources?${params}`),
+      fetch(API + `/api/magento/category-revenue?${params}`),
+      fetch(API + `/api/gsc/pages?${params}&limit=20`),
+      fetch(API + `/api/gsc/summary?${params}`),
+      fetch(API + `/api/magento/top-products?${params}`),
+      fetch(API + `/api/magento/product-dropoffs?${params}`),
     ]);
 
     // Revenue + Sessions chart
@@ -1513,7 +1561,7 @@ async function loadDashboard() {
 
     // Search trend chart
     if (revRes.ok) {
-      const { labels, sessions } = await (await fetch(API + `/api/ga4/sessions-revenue?days=${DAYS}`)).json().catch(()=>({labels:L30,sessions:wave(30,620,140)}));
+      const { labels, sessions } = await (await fetch(API + `/api/ga4/sessions-revenue?${apiParams()}`)).json().catch(()=>({labels:L30,sessions:wave(30,620,140)}));
       buildSearchChart(labels, sessions);
     }
 
@@ -1527,40 +1575,46 @@ async function loadDashboard() {
         const el = document.getElementById('kpi-merch-topproduct');
         if (el) {
           el.querySelector('.kpi-value').textContent = top.sku || top.name.substring(0,10);
-          el.querySelector('.kpi-delta').textContent = rev + ' last month';
+          el.querySelector('.kpi-delta').textContent = rev + ' in selected period';
           el.querySelector('.kpi-delta').className = 'kpi-delta up';
         }
       }
     }
 
-    // Dormant top sellers count + detail panel
-    fetch(API + '/api/magento/dormant-top-sellers').then(r => r.json()).then(d => {
-      const el = document.getElementById('kpi-merch-dormant');
-      const panel = document.getElementById('dormant-panel');
-      const list  = document.getElementById('dormant-list');
+    // Range-aware product drop-offs count + detail panel
+    if (dropoffRes.ok) {
+      const d = await dropoffRes.json();
+      const el = document.getElementById('kpi-merch-dropoffs');
+      const panel = document.getElementById('product-dropoff-panel');
+      const list  = document.getElementById('product-dropoff-list');
       if (el && d.products) {
         const count = d.products.length;
         el.querySelector('.kpi-value').textContent = count;
         el.querySelector('.kpi-delta').className = count > 0 ? 'kpi-delta dn' : 'kpi-delta neu';
+        el.querySelector('.kpi-delta').textContent = count > 0 ? `Declined ${comparisonText()}` : `No major declines ${comparisonText()}`;
 
         if (count > 0 && panel && list) {
           panel.style.display = 'block';
           list.innerHTML = d.products.map(p => {
-            const rev = p.revenue_last_month >= 1000
-              ? '$' + (p.revenue_last_month/1000).toFixed(1) + 'K'
-              : '$' + p.revenue_last_month.toFixed(0);
+            const prev = p.previous_revenue >= 1000
+              ? '$' + (p.previous_revenue/1000).toFixed(1) + 'K'
+              : '$' + p.previous_revenue.toFixed(0);
+            const curr = p.current_revenue >= 1000
+              ? '$' + (p.current_revenue/1000).toFixed(1) + 'K'
+              : '$' + p.current_revenue.toFixed(0);
+            const delta = p.delta === null || p.delta === undefined ? '—' : p.delta + '%';
             return `<div class="trend-row">
-              <div class="trend-label" style="font-family:var(--mono);font-size:12px;">${p.sku}</div>
-              <div style="flex:2;font-size:12.5px;color:var(--text2);padding:0 12px;">${p.name}</div>
-              <div class="trend-val">${rev} last mo.</div>
-              <div class="trend-delta dn">0 orders</div>
+              <div class="trend-label" style="font-family:var(--mono);font-size:12px;">${escapeHTML(p.sku)}</div>
+              <div style="flex:2;font-size:12.5px;color:var(--text2);padding:0 12px;">${escapeHTML(p.name)}</div>
+              <div class="trend-val">${prev} → ${curr}</div>
+              <div class="trend-delta dn">${delta}</div>
             </div>`;
           }).join('');
         } else if (panel) {
           panel.style.display = 'none';
         }
       }
-    }).catch(()=>{});
+    }
 
     // If already on AI or Opps page, re-fetch with new date range
     const currentPage = document.querySelector('.page.active');
@@ -1612,12 +1666,13 @@ function renderSeoPageList(pages) {
     </div>
     ${opps.map((p, i) => {
       const path     = p.url.replace('https://www.mockett.com','').replace('https://mockett.com','') || '/';
+      const safePath = escapeHTML(path);
       const imprK    = p.impressions >= 1000 ? (p.impressions/1000).toFixed(1)+'K' : p.impressions;
       const barW     = Math.round((p.impressions / maxImpr) * 100);
       const ctrColor = p.ctr < 1.0 ? 'var(--red)' : p.ctr < 2.0 ? 'var(--amber)' : 'var(--green)';
       return `<div class="seo-row">
         <div class="seo-rank">${String(i+1).padStart(2,'0')}</div>
-        <div class="seo-page" title="${path}"><strong>${path}</strong></div>
+        <div class="seo-page" title="${safePath}"><strong>${safePath}</strong></div>
         <div class="seo-impr">${imprK}</div>
         <div class="ctr-track"><div class="ctr-fill" style="width:${barW}%;background:${ctrColor}"></div></div>
         <div class="seo-ctr" style="color:${ctrColor}">${p.ctr}%</div>
@@ -1635,16 +1690,19 @@ function renderOpportunities(data) {
     return;
   }
   const BG = { high:'rgba(255,79,106,0.1)', med:'rgba(245,158,11,0.1)', low:'rgba(34,199,125,0.1)' };
-  list.innerHTML = items.map(o => `
+  list.innerHTML = items.map(o => {
+    const priority = ['high', 'med', 'low'].includes(o.priority) ? o.priority : 'low';
+    return `
     <div class="opp-card">
-      <div class="opp-icon" style="background:${BG[o.priority]||BG.low}">${o.icon||'📊'}</div>
+      <div class="opp-icon" style="background:${BG[priority]||BG.low}">${escapeHTML(o.icon || '📊')}</div>
       <div class="opp-content">
-        <div class="opp-title">${o.title}</div>
-        <div class="opp-desc">${o.desc} · <span style="font-family:var(--mono);font-size:11px;color:var(--accent2)">${o.action}</span></div>
+        <div class="opp-title">${escapeHTML(o.title)}</div>
+        <div class="opp-desc">${escapeHTML(o.desc)} · <span style="font-family:var(--mono);font-size:11px;color:var(--accent2)">${escapeHTML(o.action)}</span></div>
       </div>
-      <div class="priority-tag ${o.priority}">${o.priority==='med'?'Medium':o.priority.charAt(0).toUpperCase()+o.priority.slice(1)}</div>
+      <div class="priority-tag ${priority}">${priority==='med'?'Medium':priority.charAt(0).toUpperCase()+priority.slice(1)}</div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 /* ─── RENDER AI SUMMARY ─── */
@@ -1657,7 +1715,8 @@ function renderAiSummary(data) {
 
   if (time && data.generated_at) {
     const d = new Date(data.generated_at);
-    time.textContent = 'Generated ' + d.toLocaleTimeString() + ' · GPT-4.1-mini';
+    const period = data.period && data.period.label ? data.period.label + ' · ' : '';
+    time.textContent = period + 'Generated ' + d.toLocaleTimeString() + ' · GPT-4.1-mini';
   }
 
   if (!body || !data.insights) return;
@@ -1667,9 +1726,9 @@ function renderAiSummary(data) {
     <div class="ai-insight">
       <div class="ai-insight-icon ${ICON_CLASS[ins.type] || 'info'}">${ICONS[ins.type] || '🔍'}</div>
       <div class="ai-insight-content">
-        <div class="ai-insight-title">${ins.title}</div>
-        <div class="ai-insight-desc">${ins.description}</div>
-        ${ins.action ? `<div class="action-chips"><span class="action-chip">${ins.action}</span></div>` : ''}
+        <div class="ai-insight-title">${escapeHTML(ins.title)}</div>
+        <div class="ai-insight-desc">${escapeHTML(ins.description)}</div>
+        ${ins.action ? `<div class="action-chips"><span class="action-chip">${escapeHTML(ins.action)}</span></div>` : ''}
       </div>
     </div>
   `).join('');
