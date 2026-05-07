@@ -302,7 +302,8 @@
   .page.active { display: flex; flex-direction: column; gap: 22px; }
 
   /* ─── GRIDS ─── */
-  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; align-items: start; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .kpi-card { min-height: unset; }
   .two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .wide-col  { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
 
@@ -541,7 +542,6 @@
 
   .ai-divider { border: none; border-top: 1px solid rgba(61,127,255,0.07); }
 
-  /* ─── PRINT / PDF STYLES ─── */
   @media print {
     body { background: #fff !important; color: #111 !important; }
     .shell { display: block !important; }
@@ -1131,12 +1131,16 @@ function applyCustomRange() {
 
 /* ─── PRINT AI SUMMARY AS PDF ─── */
 function printAiSummary() {
-  // Ensure AI page is active so print CSS targets it correctly
+  // Save currently active page
+  const currentActive = document.querySelector('.page.active');
+  const currentNavItem = document.querySelector('.nav-item.active');
+  // Activate AI page for printing
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-ai').classList.add('active');
   window.print();
-  // Restore the AI page as active after print dialog closes
-  document.getElementById('page-ai').classList.add('active');
+  // Restore previous state after print dialog closes
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  if (currentActive) currentActive.classList.add('active');
 }
 
 /* ─── NAVIGATION ─── */
