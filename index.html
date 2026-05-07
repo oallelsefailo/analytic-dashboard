@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="https://www.mockett.com/static/version1776862565/frontend/WSM/Base/en_US/Magento_Theme/favicon-16x16.png">
 <title>Mockett AI — Executive Insights Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -133,7 +134,7 @@
 
   .logo-mark {
     width: 34px; height: 34px;
-    background: linear-gradient(135deg, #3d7fff, #9b72ff);
+    background: #cc0033;
     border-radius: 9px;
     display: flex; align-items: center; justify-content: center;
     font-size: 15px; font-weight: 700; color: #fff;
@@ -172,7 +173,7 @@
 
   .avatar {
     width: 30px; height: 30px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), var(--purple));
+    background: #cc0033;
     display: flex; align-items: center; justify-content: center;
     font-size: 11px; font-weight: 600; color: #fff; flex-shrink: 0;
   }
@@ -637,7 +638,7 @@
         <div class="avatar">WO</div>
         <div>
           <div class="user-name">Web Operations</div>
-          <div class="user-role">mockett.com</div>
+          <div class="user-role" title="Access controlled via Cloudflare Access">mockett.com · secured</div>
         </div>
       </div>
     </div>
@@ -742,12 +743,16 @@
       <div class="wide-col">
         <div class="panel">
           <div class="panel-header">
-            <div class="panel-title"><div class="dot blue"></div>Revenue &amp; Sessions — 30 Days</div>
-            <span class="panel-tag blue">GA4</span>
+            <div class="panel-title"><div class="dot blue"></div><span id="rev-chart-label">Revenue &amp; Sessions — 30 Days</span></div>
+            <div style="display:flex;align-items:center;gap:12px;font-size:11.5px;color:var(--text3)">
+              <span style="display:flex;align-items:center;gap:5px"><span style="width:18px;height:2px;background:#3d7fff;display:inline-block;border-radius:2px"></span>Revenue</span>
+              <span style="display:flex;align-items:center;gap:5px"><span style="width:18px;height:2px;background:#9b72ff;display:inline-block;border-radius:2px;border-top:2px dashed #9b72ff;height:0"></span>Sessions</span>
+              <span class="panel-tag blue">GA4</span>
+            </div>
           </div>
           <div class="panel-body">
             <div class="chart-wrap">
-              <canvas id="revChart" role="img" aria-label="Line chart of revenue and sessions over 30 days">Revenue and sessions over 30 days, both trending upward.</canvas>
+              <canvas id="revChart" role="img" aria-label="Line chart of revenue and sessions">Revenue and sessions over selected period.</canvas>
             </div>
           </div>
         </div>
@@ -1021,11 +1026,11 @@
           </div>
         </div>
 
-        <div class="panel">
+        <div class="panel" style="display:flex;flex-direction:column;">
           <div class="panel-header">
             <div class="panel-title"><div class="dot green"></div>Revenue vs. Traffic — Categories</div>
           </div>
-          <div class="panel-body" id="merch-trend-rows">
+          <div id="merch-trend-rows" style="overflow-y:auto;max-height:260px;padding:0 20px;flex:1;">
           </div>
         </div>
       </div>
@@ -1212,13 +1217,12 @@ function fmtDelta(val, type) {
   const sign = val > 0 ? '▲' : val < 0 ? '▼' : '—';
   const cls  = val > 0 ? 'up' : val < 0 ? 'dn' : 'neu';
   const dir  = val > 0 ? 'up' : 'down';
+  const period = `vs prior ${DAYS} days`;
   let txt;
-  if (type === 'conversion') {
-    txt = `${sign} ${dir} ${abs}% vs last month`;
-  } else if (type === 'engagement') {
-    txt = `${sign} ${dir} ${abs}% vs last month`;
+  if (type === 'conversion' || type === 'engagement') {
+    txt = `${sign} ${dir} ${abs}% ${period}`;
   } else {
-    txt = `${sign} ${abs}% vs last month`;
+    txt = `${sign} ${abs}% ${period}`;
   }
   return { cls, txt };
 }
@@ -1337,14 +1341,24 @@ function buildSearchChart(labels, data) {
 function buildSeoChart(pages) {
   const ctx = document.getElementById('seoChart');
   if (seoChartInst) seoChartInst.destroy();
-  const scatterData = pages.map(p => ({ x: parseFloat((p.impressions/1000).toFixed(1)), y: p.ctr }));
+  const scatterData = pages.map(p => ({
+    x: parseFloat((p.impressions/1000).toFixed(1)),
+    y: p.ctr,
+    url: p.url.replace('https://www.mockett.com','').replace('https://mockett.com','') || '/'
+  }));
   seoChartInst = new Chart(ctx, {
     type:'scatter',
     data:{ datasets:[{ label:'Pages', data:scatterData,
       backgroundColor:'rgba(61,127,255,0.65)', borderColor:'rgba(61,127,255,0.9)', pointRadius:8, pointHoverRadius:10 }] },
     options:{
       responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display:false}, tooltip:{...TT, callbacks:{label:ctx=>ctx.raw.x+'K impr · '+ctx.raw.y+'% CTR'}}},
+      plugins:{
+        legend:{display:false},
+        tooltip:{...TT, callbacks:{
+          title: items => items[0].raw.url,
+          label: ctx => `${ctx.raw.x}K impressions · ${ctx.raw.y}% CTR`
+        }}
+      },
       scales:{
         x:{title:{display:true,text:'Impressions (K)',color:TICKS,font:{size:11}}, grid:{color:GRID}, ticks:{color:TICKS,font:{size:11},callback:v=>v+'K'}},
         y:{title:{display:true,text:'CTR (%)',color:TICKS,font:{size:11}}, grid:{color:GRID}, ticks:{color:TICKS,font:{size:11},callback:v=>v+'%'}}
@@ -1396,10 +1410,12 @@ async function loadDashboard() {
   showLoadingState(`Fetching ${DAYS}-day data...`);
 
   // Update dynamic period labels
-  const periodLabel = document.getElementById('trend-period-label');
-  const merchLabel  = document.getElementById('merch-products-label');
+  const periodLabel  = document.getElementById('trend-period-label');
+  const merchLabel   = document.getElementById('merch-products-label');
+  const revLabel     = document.getElementById('rev-chart-label');
   if (periodLabel) periodLabel.textContent = `Category ${DAYS}-Day Trends`;
   if (merchLabel)  merchLabel.textContent  = `Top Products by Revenue — Last ${DAYS} Days`;
+  if (revLabel)    revLabel.textContent    = `Revenue & Sessions — ${DAYS} Days`;
 
   const aiBody = document.getElementById('ai-body');
   const oppList = document.getElementById('opp-list');
@@ -1409,7 +1425,7 @@ async function loadDashboard() {
     // ── Fire all non-AI fetches in parallel ──────────────────────────
     const [revRes, kpiRes, srcRes, catRes, seoRes, gscRes, vnpRes] = await Promise.all([
       fetch(API + `/api/ga4/sessions-revenue?days=${DAYS}`),
-      fetch(API + `/api/ga4/kpis`),
+      fetch(API + `/api/ga4/kpis?days=${DAYS}`),
       fetch(API + `/api/ga4/traffic-sources?days=${DAYS}`),
       fetch(API + `/api/magento/category-revenue?days=${DAYS}`),
       fetch(API + `/api/gsc/pages?days=${DAYS}&limit=20`),

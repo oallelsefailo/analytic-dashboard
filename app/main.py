@@ -144,11 +144,14 @@ def ga4_sessions_revenue(days: int = 30):
 
 
 @app.get("/api/ga4/kpis")
-def ga4_kpis():
-    """Rolling 30-day KPIs vs prior 30 days. Powers the 4 KPI cards."""
+def ga4_kpis(days: int = 30):
+    """Rolling N-day KPIs vs prior N days. Powers the 4 KPI cards."""
     try:
-        client              = get_ga4_client()
-        start, end, ps, pe  = rolling_30()
+        client     = get_ga4_client()
+        end        = date.today() - timedelta(days=1)
+        start      = end - timedelta(days=days - 1)
+        prev_end   = start - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=days - 1)
 
         def fetch(s, e):
             req = RunReportRequest(
@@ -168,10 +171,11 @@ def ga4_kpis():
             }
 
         curr = fetch(start, end)
-        prev = fetch(ps, pe)
+        prev = fetch(prev_start, prev_end)
         return {
             "current":  curr,
             "previous": prev,
+            "period_days": days,
             "deltas": {
                 "sessions":        pct_delta(curr["sessions"],        prev["sessions"]),
                 "revenue":         pct_delta(curr["revenue"],         prev["revenue"]),
@@ -532,7 +536,7 @@ def ai_summary(days: int = 30):
         metrics = {}
 
         try:
-            metrics["ga4"] = ga4_kpis()
+            metrics["ga4"] = ga4_kpis(days=days)
         except:
             metrics["ga4"] = None
 
