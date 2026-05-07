@@ -832,120 +832,18 @@
          PAGE: SEARCH INTELLIGENCE
     ══════════════════════════════════════ -->
     <div id="page-search" class="content page">
-      <div class="kpi-grid">
-        <div class="kpi-card blue">
-          <div class="kpi-header"><div class="kpi-label">Clean Searches</div><div class="kpi-icon blue">🔍</div></div>
-          <div class="kpi-value">18,441</div>
-          <div class="kpi-delta up">▲ 5.2% this month</div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;gap:20px;text-align:center;">
+        <div style="font-size:48px;">🔧</div>
+        <div style="font-size:20px;font-weight:600;color:var(--text)">Search Intelligence — Coming Soon</div>
+        <div style="font-size:14px;color:var(--text3);max-width:480px;line-height:1.7;">
+          This section requires a custom Magento 2 search logger module to capture clean on-site search data.
+          The module is currently being developed and will be deployed by the backend team.
+          <br><br>
+          Once live, this page will show real customer search terms, zero-result queries, and search-to-purchase conversion — all bot-filtered.
         </div>
-        <div class="kpi-card red">
-          <div class="kpi-header"><div class="kpi-label">Zero-Result Terms</div><div class="kpi-icon red">⛔</div></div>
-          <div class="kpi-value">342</div>
-          <div class="kpi-delta dn">▲ needs attention</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 24px;font-size:13px;color:var(--text2);">
+          In the meantime, use the <strong>SEO Performance</strong> tab for Google Search Console query data.
         </div>
-        <div class="kpi-card green">
-          <div class="kpi-header"><div class="kpi-label">Search → Purchase</div><div class="kpi-icon green">✓</div></div>
-          <div class="kpi-value">4.8%</div>
-          <div class="kpi-delta up">▲ 0.4pp</div>
-        </div>
-        <div class="kpi-card purple">
-          <div class="kpi-header"><div class="kpi-label">Bot-Filtered</div><div class="kpi-icon purple">🛡</div></div>
-          <div class="kpi-value">2,118</div>
-          <div class="kpi-delta neu">— auto-filtered</div>
-        </div>
-      </div>
-
-      <div class="two-col">
-        <div class="panel">
-          <div class="panel-header">
-            <div class="panel-title"><div class="dot blue"></div>Top Clean Search Terms</div>
-            <span class="panel-tag blue">Custom logger</span>
-          </div>
-          <div class="panel-body">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Term</th>
-                  <th>Volume</th>
-                  <th>Results</th>
-                  <th>CTR</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><span class="term-badge">cable raceway</span></td>
-                  <td>934</td>
-                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:90%"></div></div></td>
-                  <td>72%</td>
-                  <td><span class="status"><span class="s-dot ok"></span>Good</span></td>
-                </tr>
-                <tr>
-                  <td><span class="term-badge">under desk power</span></td>
-                  <td>812</td>
-                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:78%"></div></div></td>
-                  <td>29%</td>
-                  <td><span class="status"><span class="s-dot warn"></span>Low CTR</span></td>
-                </tr>
-                <tr>
-                  <td><span class="term-badge">wire organizer</span></td>
-                  <td>744</td>
-                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:74%"></div></div></td>
-                  <td>61%</td>
-                  <td><span class="status"><span class="s-dot ok"></span>Good</span></td>
-                </tr>
-                <tr>
-                  <td><span class="term-badge">desk grommet</span></td>
-                  <td>521</td>
-                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:55%"></div></div></td>
-                  <td>45%</td>
-                  <td><span class="status"><span class="s-dot ok"></span>OK</span></td>
-                </tr>
-                <tr>
-                  <td><span class="term-badge">cable tray</span></td>
-                  <td>488</td>
-                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:50%"></div></div></td>
-                  <td>80%</td>
-                  <td><span class="status"><span class="s-dot ok"></span>Good</span></td>
-                </tr>
-                <tr>
-                  <td><span class="term-badge">conference power hub</span></td>
-                  <td>312</td>
-                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:30%"></div></div></td>
-                  <td>11%</td>
-                  <td><span class="status"><span class="s-dot bad"></span>Exit risk</span></td>
-                </tr>
-                <tr>
-                  <td><span class="term-badge">wire sleeve</span></td>
-                  <td>277</td>
-                  <td><div class="mini-bar-track"><div class="mini-bar-fill" style="width:28%"></div></div></td>
-                  <td>38%</td>
-                  <td><span class="status"><span class="s-dot warn"></span>Review</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-header">
-            <div class="panel-title"><div class="dot teal"></div>Search Volume — 30 Day Trend</div>
-          </div>
-          <div class="panel-body">
-            <div class="chart-wrap-tall">
-              <canvas id="searchChart" role="img" aria-label="Line chart of daily clean search volume">Daily clean search volume over 30 days.</canvas>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="anomaly">
-        <div class="anomaly-icon">🔎</div>
-        <div class="anomaly-content">
-          <div class="anomaly-title">High-volume exits — "conference power hub"</div>
-          <div class="anomaly-desc">312 searches/mo with 11% click-through. Users expect a dedicated category. Suggested: review_search_redirects, review_search_synonyms in Magento admin.</div>
-        </div>
-        <div class="priority-tag high">Action</div>
       </div>
     </div>
 
