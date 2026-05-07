@@ -359,7 +359,7 @@
   }
   .trend-row:last-child { border-bottom: none; }
   .trend-label { font-size: 12.5px; color: var(--text2); flex: 1; }
-  .trend-val   { font-size: 12.5px; font-family: var(--mono); width: 56px; text-align: right; }
+  .trend-val   { font-size: 12.5px; font-family: var(--mono); min-width: 92px; text-align: right; white-space: nowrap; }
   .trend-delta { font-size: 11.5px; font-weight: 500; width: 72px; text-align: right; white-space: nowrap; flex-shrink: 0; }
   .trend-delta.up { color: var(--green); }
   .trend-delta.dn { color: var(--red); }
@@ -825,17 +825,48 @@
          PAGE: SEARCH INTELLIGENCE
     ══════════════════════════════════════ -->
     <div id="page-search" class="content page">
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:400px;gap:20px;text-align:center;">
+      <div class="kpi-grid">
+        <div class="kpi-card blue" id="kpi-search-total" title="GA4 sessions with an on-site search term in the selected period. Blank searchTerm rows are filtered out.">
+          <div class="kpi-header"><div class="kpi-label">Search Sessions</div><div class="kpi-icon blue">🔍</div></div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">GA4 searchTerm</div>
+        </div>
+        <div class="kpi-card green" id="kpi-search-unique" title="Unique on-site search terms after case-insensitive grouping.">
+          <div class="kpi-header"><div class="kpi-label">Unique Terms</div><div class="kpi-icon green">#</div></div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Case-grouped</div>
+        </div>
+        <div class="kpi-card purple" id="kpi-search-top" title="The highest-volume customer search term in this period.">
+          <div class="kpi-header"><div class="kpi-label">Top Search</div><div class="kpi-icon purple">★</div></div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Loading...</div>
+        </div>
+        <div class="kpi-card red" id="kpi-search-blanks" title="GA4 searchTerm rows without a usable term. These are filtered from the table.">
+          <div class="kpi-header"><div class="kpi-label">Blank Rows Filtered</div><div class="kpi-icon red">∅</div></div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Excluded from terms</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title"><div class="dot teal"></div><span id="search-terms-label">Customer Search Terms</span></div>
+          <span class="panel-tag blue">GA4 + Klevu</span>
+        </div>
+        <div class="panel-body" id="search-terms-list">
+          <div class="spinner"><div class="spinner-ring"></div>Loading search terms...</div>
+        </div>
+      </div>
+      <div style="display:none;">
         <div style="font-size:48px;">🔧</div>
-        <div style="font-size:20px;font-weight:600;color:var(--text)">Search Intelligence — Coming Soon</div>
+        <div style="font-size:20px;font-weight:600;color:var(--text)">Legacy search placeholder</div>
         <div style="font-size:14px;color:var(--text3);max-width:480px;line-height:1.7;">
-          This section requires a custom Magento 2 search logger module to capture clean on-site search data.
-          The module is currently being developed and will be deployed by the backend team.
+          Legacy placeholder retained hidden for layout safety.
           <br><br>
-          Once live, this page will show real customer search terms, zero-result queries, and search-to-purchase conversion — all bot-filtered.
+          Live search terms now render above.
         </div>
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 24px;font-size:13px;color:var(--text2);">
-          In the meantime, use the <strong>SEO Performance</strong> tab for Google Search Console query data.
+          Hidden fallback.
         </div>
       </div>
     </div>
@@ -980,7 +1011,7 @@
     <div id="page-opps" class="content page">
       <div class="panel">
         <div class="panel-header">
-          <div class="panel-title"><div class="dot amber"></div>Actionable Opportunities — Ranked by Impact</div>
+          <div class="panel-title"><div class="dot amber"></div>Focused Opportunities</div>
           <span class="panel-tag teal">Live Data</span>
         </div>
         <div class="panel-body">
@@ -1051,6 +1082,10 @@ function comparisonText() {
   return CUSTOM_START && CUSTOM_END ? `vs prior ${DAYS}-day period` : `vs prior ${DAYS} days`;
 }
 
+function rangeKey() {
+  return apiParams();
+}
+
 function parseDateInput(value) {
   const [year, month, day] = value.split('-').map(Number);
   return new Date(year, month - 1, day);
@@ -1087,6 +1122,7 @@ function setDays(days, label) {
   // Reset lazy-load trackers so AI/opps re-fetch with new date if visited
   aiLoadedForDays   = null;
   oppsLoadedForDays = null;
+  searchLoadedForRange = null;
   loadDashboard();
 }
 
@@ -1108,9 +1144,11 @@ function showLoadingState(label) {
   const tr  = document.getElementById('trend-rows');
   const mtr = document.getElementById('merch-trend-rows');
   const sl  = document.getElementById('seo-page-list');
+  const stl = document.getElementById('search-terms-list');
   if (tr)  tr.innerHTML  = '<div class="spinner" style="padding:12px 20px"><div class="spinner-ring"></div>Loading...</div>';
   if (mtr) mtr.innerHTML = '<div class="spinner" style="padding:12px 20px"><div class="spinner-ring"></div>Loading...</div>';
   if (sl)  sl.innerHTML  = '<div class="spinner"><div class="spinner-ring"></div>Loading SEO data...</div>';
+  if (stl) stl.innerHTML = '<div class="spinner"><div class="spinner-ring"></div>Loading search terms...</div>';
   const ab = document.getElementById('ai-body');
   const ol = document.getElementById('opp-list');
   if (ab) ab.innerHTML = '<div class="spinner"><div class="spinner-ring"></div>Generating summary — takes a few seconds...</div>';
@@ -1142,6 +1180,7 @@ function applyCustomRange() {
   document.querySelectorAll('.drp-option').forEach(o => o.classList.remove('active'));
   aiLoadedForDays   = null;
   oppsLoadedForDays = null;
+  searchLoadedForRange = null;
   loadDashboard();
 }
 
@@ -1162,7 +1201,7 @@ function printAiSummary() {
 /* ─── NAVIGATION ─── */
 const PAGES = {
   overview: { title: 'Executive Overview',      sub: 'GA4, Search Console, and Magento · Live dashboard data' },
-  search:   { title: 'Search Intelligence',     sub: 'Clean search logger · Bot-filtered · 30-day window' },
+  search:   { title: 'Search Intelligence',     sub: 'Live customer searches from GA4 + Klevu' },
   seo:      { title: 'SEO Performance',         sub: 'Google Search Console + GA4 · Impressions & CTR' },
   merch:    { title: 'Merchandising',           sub: 'Magento product & category engagement' },
   ai:       { title: 'AI Summary Panel',        sub: 'GPT-4.1-mini executive brief · Constrained recommendations' },
@@ -1172,6 +1211,7 @@ const PAGES = {
 // Track whether AI/opps have been loaded for the current DAYS value
 let aiLoadedForDays   = null;
 let oppsLoadedForDays = null;
+let searchLoadedForRange = null;
 
 function nav(id, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -1180,6 +1220,12 @@ function nav(id, el) {
   document.getElementById('page-' + id).classList.add('active');
   document.getElementById('page-title').textContent = PAGES[id].title;
   document.getElementById('page-sub').textContent   = PAGES[id].sub;
+
+  // Lazy-load AI summary only when navigating to AI page
+  if (id === 'search' && searchLoadedForRange !== rangeKey()) {
+    searchLoadedForRange = rangeKey();
+    loadSearchIntelligence();
+  }
 
   // Lazy-load AI summary only when navigating to AI page
   if (id === 'ai' && aiLoadedForDays !== DAYS) {
@@ -1377,6 +1423,72 @@ function buildSearchChart(labels, data) {
 }
 
 /* ─── BUILD SEO SCATTER ─── */
+function fmtSearchCount(value) {
+  return Number(value || 0).toLocaleString();
+}
+
+function fmtDropoffRevenue(value) {
+  return '$' + (Number(value || 0) / 1000).toFixed(1) + 'K';
+}
+
+function renderSearchTerms(data) {
+  const list = document.getElementById('search-terms-list');
+  const label = document.getElementById('search-terms-label');
+  if (!list) return;
+
+  const terms = data.terms || [];
+  if (label) label.textContent = `Customer Search Terms — ${currentPeriodLabel()}`;
+  document.getElementById('kpi-search-total').querySelector('.kpi-value').textContent = fmtSearchCount(data.total_search_sessions);
+  document.getElementById('kpi-search-unique').querySelector('.kpi-value').textContent = fmtSearchCount(data.unique_terms);
+  document.getElementById('kpi-search-blanks').querySelector('.kpi-value').textContent = fmtSearchCount(data.blank_sessions_filtered);
+
+  const top = data.top_term;
+  const topCard = document.getElementById('kpi-search-top');
+  if (topCard && top) {
+    topCard.querySelector('.kpi-value').textContent = top.search_term;
+    topCard.querySelector('.kpi-delta').textContent = `${fmtSearchCount(top.sessions)} sessions`;
+    topCard.querySelector('.kpi-delta').className = 'kpi-delta up';
+  }
+
+  if (!terms.length) {
+    list.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">No GA4/Klevu search terms found for this period yet.</div>';
+    return;
+  }
+
+  const maxSessions = Math.max(...terms.map(t => t.sessions), 1);
+  list.innerHTML = `
+    <div style="display:flex;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:2px;">
+      <div style="width:28px;flex-shrink:0;"></div>
+      <div style="flex:1;font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;">Search term</div>
+      <div style="width:90px;text-align:right;font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;">Sessions</div>
+      <div style="width:110px;flex-shrink:0;"></div>
+    </div>
+    ${terms.map((t, i) => {
+      const barW = Math.max(4, Math.round((t.sessions / maxSessions) * 100));
+      return `<div class="seo-row">
+        <div class="seo-rank">${String(i+1).padStart(2,'0')}</div>
+        <div class="seo-page" title="${escapeHTML(t.search_term)}"><strong>${escapeHTML(t.search_term)}</strong></div>
+        <div class="seo-impr">${fmtSearchCount(t.sessions)}</div>
+        <div class="ctr-track"><div class="ctr-fill" style="width:${barW}%;background:${t.is_sku_like ? 'var(--accent)' : 'var(--green)'}"></div></div>
+      </div>`;
+    }).join('')}`;
+}
+
+function loadSearchIntelligence() {
+  const list = document.getElementById('search-terms-list');
+  if (list) list.innerHTML = '<div class="spinner"><div class="spinner-ring"></div>Loading search terms...</div>';
+  fetch(API + `/api/ga4/search-terms?${apiParams()}&limit=40`)
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (d) renderSearchTerms(d);
+      else if (list) list.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">Could not load GA4 search terms.</div>';
+    })
+    .catch(() => {
+      searchLoadedForRange = null;
+      if (list) list.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">Could not load GA4 search terms.</div>';
+    });
+}
+
 function buildSeoChart(pages) {
   const ctx = document.getElementById('seoChart');
   if (seoChartInst) seoChartInst.destroy();
@@ -1596,12 +1708,8 @@ async function loadDashboard() {
         if (count > 0 && panel && list) {
           panel.style.display = 'block';
           list.innerHTML = d.products.map(p => {
-            const prev = p.previous_revenue >= 1000
-              ? '$' + (p.previous_revenue/1000).toFixed(1) + 'K'
-              : '$' + p.previous_revenue.toFixed(0);
-            const curr = p.current_revenue >= 1000
-              ? '$' + (p.current_revenue/1000).toFixed(1) + 'K'
-              : '$' + p.current_revenue.toFixed(0);
+            const prev = fmtDropoffRevenue(p.previous_revenue);
+            const curr = fmtDropoffRevenue(p.current_revenue);
             const delta = p.delta === null || p.delta === undefined ? '—' : p.delta + '%';
             return `<div class="trend-row">
               <div class="trend-label" style="font-family:var(--mono);font-size:12px;">${escapeHTML(p.sku)}</div>
@@ -1627,6 +1735,10 @@ async function loadDashboard() {
       oppsLoadedForDays = null;
       const fakeEl = document.querySelector('.nav-item[onclick*="opps"]');
       if (fakeEl) nav('opps', fakeEl);
+    }
+    if (currentPage && currentPage.id === 'page-search') {
+      searchLoadedForRange = null;
+      loadSearchIntelligence();
     }
 
   } catch (err) {
@@ -1690,14 +1802,25 @@ function renderOpportunities(data) {
     return;
   }
   const BG = { high:'rgba(255,79,106,0.1)', med:'rgba(245,158,11,0.1)', low:'rgba(34,199,125,0.1)' };
+  const ACTION_LABELS = {
+    review_search_snippet_alignment: 'Review search snippet',
+    review_low_ctr_page_copy: 'Review page copy',
+    review_meta_titles: 'Review search snippet',
+    review_low_ctr_pages: 'Review low-click page',
+    review_featured_products: 'Check featured products',
+    review_related_products: 'Check related products',
+    review_category_navigation: 'Review category links',
+    review_search_synonyms: 'Review search synonyms'
+  };
   list.innerHTML = items.map(o => {
     const priority = ['high', 'med', 'low'].includes(o.priority) ? o.priority : 'low';
+    const actionLabel = ACTION_LABELS[o.action] || o.action || 'Focused review';
     return `
     <div class="opp-card">
       <div class="opp-icon" style="background:${BG[priority]||BG.low}">${escapeHTML(o.icon || '📊')}</div>
       <div class="opp-content">
         <div class="opp-title">${escapeHTML(o.title)}</div>
-        <div class="opp-desc">${escapeHTML(o.desc)} · <span style="font-family:var(--mono);font-size:11px;color:var(--accent2)">${escapeHTML(o.action)}</span></div>
+        <div class="opp-desc">${escapeHTML(o.desc)} · <span style="font-size:11px;color:var(--accent2)">${escapeHTML(actionLabel)}</span></div>
       </div>
       <div class="priority-tag ${priority}">${priority==='med'?'Medium':priority.charAt(0).toUpperCase()+priority.slice(1)}</div>
     </div>

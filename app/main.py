@@ -184,6 +184,18 @@ def fmt_rev(v):
     if v >= 1_000:     return f"${v/1_000:.1f}K"
     return f"${v:.0f}"
 
+def normalize_search_term(term: str):
+    return re.sub(r"\s+", " ", (term or "").strip()).lower()
+
+def display_search_term(term: str):
+    cleaned = re.sub(r"\s+", " ", (term or "").strip())
+    if not cleaned:
+        return ""
+    sku_like = any(ch.isdigit() for ch in cleaned)
+    if sku_like and any(ch.isalpha() for ch in cleaned):
+        return cleaned.upper()
+    return cleaned
+
 def lm_dates():
     today    = date.today()
     lm_end   = today.replace(day=1) - timedelta(days=1)
@@ -291,6 +303,74 @@ def ga4_traffic_sources(days: int = 30, start_date: Optional[str] = None, end_da
             sess = int(row.metric_values[0].value)
             sources.append({"name": name, "sessions": sess, "pct": round(sess/total*100, 1) if total else 0})
         return {"sources": sources, "total": total}
+    except Exception as e:
+        api_error(e)
+
+
+@app.get("/api/ga4/search-terms")
+def ga4_search_terms(days: int = 30, start_date: Optional[str] = None, end_date: Optional[str] = None, limit: int = 40):
+    """
+    Live on-site search terms from GA4/Klevu. Blank non-search rows are filtered,
+    identical terms are grouped case-insensitively, and SKU-like searches display
+    in uppercase without merging meaningful suffixes such as DP128/9.
+    """
+    try:
+        client = get_ga4_client()
+        ctx = period_context(days, start_date, end_date)
+        limit = max(10, min(int(limit), 100))
+
+        resp = client.run_report(RunReportRequest(
+            property=f"properties/{GA4_PROPERTY_ID}",
+            date_ranges=[DateRange(start_date=ctx["start_date"], end_date=ctx["end_date"])],
+            dimensions=[Dimension(name="searchTerm")],
+            metrics=[Metric(name="sessions")],
+            order_bys=[OrderBy(metric=OrderBy.MetricOrderBy(metric_name="sessions"), desc=True)],
+            limit=250,
+        ))
+
+        grouped = {}
+        blank_sessions = 0
+        for row in resp.rows:
+            raw = row.dimension_values[0].value or ""
+            sessions = int(float(row.metric_values[0].value or 0))
+            normalized = normalize_search_term(raw)
+            if not normalized or normalized in {"(not set)", "not set", "(not provided)", "not provided"}:
+                blank_sessions += sessions
+                continue
+
+            bucket = grouped.setdefault(normalized, {
+                "search_term": display_search_term(raw),
+                "normalized": normalized,
+                "sessions": 0,
+                "variants": {},
+            })
+            bucket["sessions"] += sessions
+            display = display_search_term(raw)
+            bucket["variants"][display] = bucket["variants"].get(display, 0) + sessions
+
+        terms = []
+        for item in grouped.values():
+            variants = item.pop("variants")
+            if not (item["search_term"].isupper() and any(ch.isalpha() for ch in item["search_term"])):
+                item["search_term"] = max(variants.items(), key=lambda kv: kv[1])[0]
+            item["is_sku_like"] = any(ch.isdigit() for ch in item["search_term"])
+            terms.append(item)
+
+        terms.sort(key=lambda t: t["sessions"], reverse=True)
+        top_terms = terms[:limit]
+        return {
+            "period": {
+                "label": ctx["label"],
+                "start_date": ctx["start_date"],
+                "end_date": ctx["end_date"],
+            },
+            "terms": top_terms,
+            "total_search_sessions": sum(t["sessions"] for t in terms),
+            "unique_terms": len(terms),
+            "blank_sessions_filtered": blank_sessions,
+            "top_term": top_terms[0] if top_terms else None,
+        }
+
     except Exception as e:
         api_error(e)
 
@@ -647,6 +727,7 @@ def opportunities(days: int = 30, start_date: Optional[str] = None, end_date: Op
 The web operations manager is a solo person — they cannot action dozens of items. Identify the 5-7 most genuinely impactful opportunities from the data below. Focus on items where the gap between current performance and potential is large, specific, and actionable in a focused session.
 
 PERIOD CONTEXT:
+Opportunity count rule: Return up to 5 opportunities. Return fewer than 5 if the data does not show enough clear, focused signals. The goal is to flag where a human should look, not to create a work queue.
 Selected period label: {ctx['label']}
 Selected period type: {ctx['type']}
 Review mode: {ctx['mode']}
@@ -671,22 +752,27 @@ RULES:
 - Respect the period context. Use "{ctx['label']}", "selected period", or the exact dates.
 - Never say "last month", "this month", "month over month", or "MoM" unless the period type is calendar_month.
 - For long-term trend review, avoid urgent language unless a metric is an extreme outlier.
+- You are a signal detector, not an implementation planner. Flag the page, category, product group, or search behavior worth human review.
+- Every opportunity must be completable as a focused review in under 2 hours.
+- Use language like "review", "compare", "check", or "inspect"; avoid "rewrite all", "update every", "fix across", "roll out", or "bulk edit".
 - Select only items where the data shows a clear, specific gap or anomaly
 - Do NOT list every page with a low CTR — only the ones where the gap is exceptional
 - Vary the opportunity types — mix SEO, merchandising, and product signals
 - Write titles and descriptions in plain business English — no technical jargon
 - Each description must cite the specific number that makes it an opportunity
 - Each description must explain why the number matters and name the kind of review suggested
+- For low-CTR page signals, recommend a focused review of the named page's search snippet and visible page copy: title tag, meta description, H1, intro copy, product/category summary, and whether the snippet matches what the page actually offers.
 - Do not infer causes such as stock, visibility, appeal, or seasonality unless the provided data shows that cause
 - Do not use generic language like "improve appeal", "optimize the page", or "boost performance"
-- Do not recommend broad SKU cleanup, catalog rewrites, redesigns, or tasks that imply hundreds of edits
-- action must come from this list ONLY: review_meta_titles, review_low_ctr_pages, review_featured_products, review_related_products, review_category_navigation, review_search_synonyms
+- Do not recommend broad SKU cleanup, catalog rewrites, title-template work, redesigns, or tasks that imply hundreds of edits
+- A low-CTR opportunity should name the specific page, category, or 1-3 item sample to review. It should not imply editing every SKU in that category.
+- action must come from this list ONLY: review_search_snippet_alignment, review_low_ctr_page_copy, review_featured_products, review_related_products, review_category_navigation, review_search_synonyms
 - priority must be: high, med, or low
 - icon must be one of: 📈 📄 📦 ⚠️ ⭐ 🔍
 - No two items should have identical action values if avoidable
 
 Return ONLY valid JSON, no markdown:
-{{"opportunities":[{{"icon":"emoji","priority":"high|med|low","title":"specific plain-English title","desc":"1-2 sentences with specific numbers","action":"approved_action"}}]}}"""
+{{"opportunities":[{{"icon":"emoji","priority":"high|med|low","title":"specific plain-English title","desc":"1-2 sentences with the specific number, why it matters, and the narrow review target","action":"approved_action"}}]}}"""
 
         oai = get_openai()
         resp = oai.chat.completions.create(
@@ -832,11 +918,12 @@ STRICT RULES:
 - Each insight must say why the metric matters and name the kind of review suggested
 - Do not infer causes such as stock, visibility, appeal, or seasonality unless the provided data shows that cause
 - Do not use generic language like "improve appeal", "optimize the page", or "boost performance"
-- Do not recommend broad SKU cleanup, catalog rewrites, redesigns, or tasks that imply hundreds of edits
+- Do not recommend broad SKU cleanup, catalog rewrites, title-template work, redesigns, or tasks that imply hundreds of edits
+- For low-CTR page signals, frame the action as a focused review of 1-3 named pages' search snippet and visible page copy. Do not imply SKU-wide metadata edits.
 - Each suggested review must be focused enough to complete in under 2 hours
 - Suggest exactly ONE action per insight from this approved list:
   review_search_synonyms, review_zero_result_terms, review_search_redirects,
-  review_meta_titles, review_low_ctr_pages, review_related_products,
+  review_search_snippet_alignment, review_low_ctr_page_copy, review_related_products,
   review_featured_products, review_category_navigation
 - No two insights should suggest the same action
 - type must be one of: positive, warning, info, alert
