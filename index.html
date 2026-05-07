@@ -638,9 +638,13 @@
         <div class="avatar">WO</div>
         <div>
           <div class="user-name">Web Operations</div>
-          <div class="user-role" title="Access controlled via Cloudflare Access">mockett.com · secured</div>
+          <div class="user-role">mockett.com · secured</div>
         </div>
       </div>
+      <a href="/cdn-cgi/access/logout" style="display:block;margin-top:10px;font-size:11.5px;color:var(--text3);text-decoration:none;padding:6px 8px;border-radius:6px;transition:background 0.15s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="vertical-align:middle;margin-right:5px;"><path d="M5 2H2a1 1 0 00-1 1v6a1 1 0 001 1h3M8 9l3-3-3-3M11 6H4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Sign out
+      </a>
     </div>
   </aside>
 
@@ -677,6 +681,16 @@
           <div class="drp-option active" onclick="setDays(30, 'Last 30 Days')">Last 30 Days</div>
           <div class="drp-option" onclick="setDays(90, 'Last Quarter')">Last Quarter (90 days)</div>
           <div class="drp-option" onclick="setDays(270,'Last 3 Quarters')">Last 3 Quarters</div>
+          <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
+          <div style="padding:8px 16px;">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Custom range</div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <input type="date" id="drp-start" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);width:130px;">
+              <span style="color:var(--text3);font-size:12px;">to</span>
+              <input type="date" id="drp-end" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);width:130px;">
+              <button onclick="applyCustomRange()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:var(--font);">Apply</button>
+            </div>
+          </div>
         </div>
 
         <!-- Theme toggle -->
@@ -1028,7 +1042,7 @@
 
         <div class="panel" style="display:flex;flex-direction:column;">
           <div class="panel-header">
-            <div class="panel-title"><div class="dot green"></div>Revenue vs. Traffic — Categories</div>
+            <div class="panel-title"><div class="dot green"></div>Category Revenue Trends</div>
           </div>
           <div id="merch-trend-rows" style="overflow-y:auto;max-height:260px;padding:0 20px;flex:1;">
           </div>
@@ -1120,6 +1134,9 @@ function setDays(days, label) {
   document.getElementById('drp-dropdown').style.display = 'none';
   document.querySelectorAll('.drp-option').forEach(o => o.classList.remove('active'));
   event.target.classList.add('active');
+  // Reset lazy-load trackers so AI/opps re-fetch with new date if visited
+  aiLoadedForDays   = null;
+  oppsLoadedForDays = null;
   loadDashboard();
 }
 
@@ -1155,6 +1172,27 @@ function hideLoadingState() {
   if (overlay) overlay.style.display = 'none';
 }
 
+function applyCustomRange() {
+  const start = document.getElementById('drp-start').value;
+  const end   = document.getElementById('drp-end').value;
+  if (!start || !end) { alert('Please select both a start and end date.'); return; }
+  if (start >= end)   { alert('Start date must be before end date.'); return; }
+
+  const ms   = new Date(end) - new Date(start);
+  const days = Math.round(ms / (1000 * 60 * 60 * 24));
+
+  if (days > 500) { alert('Custom range cannot exceed 500 days.'); return; }
+
+  DAYS = days;
+  const fmt = d => new Date(d).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+  document.getElementById('drp-label').textContent = `${fmt(start)} – ${fmt(end)}`;
+  document.getElementById('drp-dropdown').style.display = 'none';
+  document.querySelectorAll('.drp-option').forEach(o => o.classList.remove('active'));
+  aiLoadedForDays   = null;
+  oppsLoadedForDays = null;
+  loadDashboard();
+}
+
 /* ─── NAVIGATION ─── */
 const PAGES = {
   overview: { title: 'Executive Overview',      sub: 'All data sources synced · Last updated 4 min ago' },
@@ -1165,6 +1203,10 @@ const PAGES = {
   opps:     { title: 'Opportunities',           sub: 'AI-detected · Ranked by estimated impact' }
 };
 
+// Track whether AI/opps have been loaded for the current DAYS value
+let aiLoadedForDays   = null;
+let oppsLoadedForDays = null;
+
 function nav(id, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   el.classList.add('active');
@@ -1172,6 +1214,28 @@ function nav(id, el) {
   document.getElementById('page-' + id).classList.add('active');
   document.getElementById('page-title').textContent = PAGES[id].title;
   document.getElementById('page-sub').textContent   = PAGES[id].sub;
+
+  // Lazy-load AI summary only when navigating to AI page
+  if (id === 'ai' && aiLoadedForDays !== DAYS) {
+    aiLoadedForDays = DAYS;
+    const aiBody = document.getElementById('ai-body');
+    if (aiBody) aiBody.innerHTML = '<div class="spinner"><div class="spinner-ring"></div>Generating summary — takes a few seconds...</div>';
+    fetch(API + `/api/ai/summary?days=${DAYS}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) renderAiSummary(d); else if (aiBody) aiBody.innerHTML = '<div style="color:var(--text3);font-size:13px;">Could not load AI summary.</div>'; })
+      .catch(() => { if (aiBody) aiBody.innerHTML = '<div style="color:var(--text3);font-size:13px;">Could not load AI summary.</div>'; });
+  }
+
+  // Lazy-load opportunities only when navigating to opportunities page
+  if (id === 'opps' && oppsLoadedForDays !== DAYS) {
+    oppsLoadedForDays = DAYS;
+    const oppList = document.getElementById('opp-list');
+    if (oppList) oppList.innerHTML = '<div class="spinner"><div class="spinner-ring"></div>Analyzing data for opportunities...</div>';
+    fetch(API + `/api/opportunities?days=${DAYS}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) renderOpportunities(d); else if (oppList) oppList.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">Could not load opportunities.</div>'; })
+      .catch(() => { if (oppList) oppList.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">Could not load opportunities.</div>'; });
+  }
 }
 
 /* ─── CHART HELPERS ─── */
@@ -1516,7 +1580,7 @@ async function loadDashboard() {
     // Restore chart opacity now that data is loaded
     hideLoadingState();
 
-    // Search trend chart (reuses rev fetch data — same endpoint)
+    // Search trend chart
     if (revRes.ok) {
       const { labels, sessions } = await (await fetch(API + `/api/ga4/sessions-revenue?days=${DAYS}`)).json().catch(()=>({labels:L30,sessions:wave(30,620,140)}));
       buildSearchChart(labels, sessions);
@@ -1547,29 +1611,22 @@ async function loadDashboard() {
       }
     }).catch(()=>{});
 
-    // ── Fire AI calls after charts are rendered (these are slow) ─────
-    // Opportunities and AI summary run in parallel but don't block charts
-    Promise.all([
-      fetch(API + `/api/opportunities?days=${DAYS}`),
-      fetch(API + `/api/ai/summary?days=${DAYS}`),
-    ]).then(async ([oppRes2, aiRes]) => {
-      if (oppRes2.ok) renderOpportunities(await oppRes2.json());
-      else if (oppList) oppList.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">Could not load opportunities.</div>';
-
-      if (aiRes.ok) renderAiSummary(await aiRes.json());
-      else if (aiBody) aiBody.innerHTML = '<div style="color:var(--text3);font-size:13px;">Could not load AI summary.</div>';
-    }).catch(() => {
-      if (oppList) oppList.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">Could not load opportunities.</div>';
-      if (aiBody)  aiBody.innerHTML  = '<div style="color:var(--text3);font-size:13px;">Could not load AI summary.</div>';
-    });
+    // ── Fire AI calls ONLY when on those pages (see nav function) ───
+    // AI Summary and Opportunities are NOT fetched here to avoid
+    // unnecessary OpenAI charges on every date change.
 
   } catch (err) {
     console.warn('Backend not reachable — using mock data.', err);
+    hideLoadingState();
     buildRevChart(L30, wave(30,9000,2200), wave(30,1400,350));
     buildDonutChart([{name:'Organic',pct:48},{name:'Direct',pct:22},{name:'Referral',pct:18},{name:'Paid',pct:12}]);
     buildCatChart([{name:'DP3 Series',revenue:92410,delta:null}]);
     buildSearchChart(L30, wave(30,620,140));
     buildSeoChart([{impressions:48200,ctr:0.9},{impressions:39100,ctr:1.4}]);
+    const aiBody = document.getElementById('ai-body');
+    const oppList = document.getElementById('opp-list');
+    if (aiBody)  aiBody.innerHTML  = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">⚠️ Google credentials not found. Copy .env and credentials/ folder from your work machine.</div>';
+    if (oppList) oppList.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">⚠️ Cannot load opportunities — API connection failed.</div>';
   }
 }
 
