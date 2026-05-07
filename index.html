@@ -541,7 +541,36 @@
 
   .ai-divider { border: none; border-top: 1px solid rgba(61,127,255,0.07); }
 
-  /* ─── SCROLLBAR ─── */
+  /* ─── PRINT / PDF STYLES ─── */
+  @media print {
+    body { background: #fff !important; color: #111 !important; }
+    .shell { display: block !important; }
+    .sidebar { display: none !important; }
+    .topbar { display: none !important; }
+    .main { overflow: visible !important; }
+    .page { display: none !important; }
+    #page-ai { display: block !important; padding: 0 !important; }
+    .ai-panel {
+      background: #fff !important;
+      border: 1px solid #ddd !important;
+      border-radius: 8px !important;
+      box-shadow: none !important;
+    }
+    .ai-header {
+      border-bottom: 1px solid #eee !important;
+      background: #f8f8f8 !important;
+    }
+    .ai-badge { background: #eee !important; color: #333 !important; border: 1px solid #ccc !important; }
+    .ai-title { color: #111 !important; }
+    .ai-time  { color: #666 !important; }
+    #ai-print-btn { display: none !important; }
+    .ai-insight-title { color: #111 !important; }
+    .ai-insight-desc  { color: #444 !important; }
+    .ai-divider { border-color: #eee !important; }
+    .action-chip { background: #f0f4ff !important; color: #2563eb !important; border-color: #c7d7f9 !important; }
+    .ai-insight-icon { background: #f5f5f5 !important; }
+    .loading-overlay { display: none !important; }
+  }
   .main::-webkit-scrollbar { width: 5px; }
   .main::-webkit-scrollbar-track { background: transparent; }
   .main::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
@@ -719,7 +748,7 @@
 
       <!-- KPIs -->
       <div class="kpi-grid">
-        <div class="kpi-card blue" id="kpi-revenue">
+        <div class="kpi-card blue" id="kpi-revenue" title="Total revenue from completed web orders in the selected period, pulled from GA4 ecommerce data.">
           <div class="kpi-header">
             <div class="kpi-label">Total Revenue</div>
             <div class="kpi-icon blue">💰</div>
@@ -727,7 +756,7 @@
           <div class="kpi-value">$284,920</div>
           <div class="kpi-delta up">▲ 12.4% vs last month</div>
         </div>
-        <div class="kpi-card green" id="kpi-sessions">
+        <div class="kpi-card green" id="kpi-sessions" title="Total number of visits to the website. One session = one visit, regardless of how many pages were viewed.">
           <div class="kpi-header">
             <div class="kpi-label">Sessions</div>
             <div class="kpi-icon green">👥</div>
@@ -735,7 +764,7 @@
           <div class="kpi-value">41,882</div>
           <div class="kpi-delta up">▲ 8.1% vs last month</div>
         </div>
-        <div class="kpi-card red" id="kpi-conversion">
+        <div class="kpi-card red" id="kpi-conversion" title="Out of every 100 visitors, how many placed an order. Higher is better. Industry average for B2B is 1-3%.">
           <div class="kpi-header">
             <div class="kpi-label">Orders per 100 Visitors</div>
             <div class="kpi-icon red">🎯</div>
@@ -744,6 +773,8 @@
           <div class="kpi-delta dn">▼ down vs last month</div>
         </div>
         <div class="kpi-card purple" id="kpi-engagement">
+          <div class="kpi-header">
+        <div class="kpi-card purple" id="kpi-engagement" title="Percentage of visitors who actively engaged with the site — scrolled, clicked, or spent 10+ seconds on a page. Higher means visitors found what they were looking for.">
           <div class="kpi-header">
             <div class="kpi-label">Visitor Engagement Rate</div>
             <div class="kpi-icon purple">🔍</div>
@@ -852,22 +883,22 @@
     ══════════════════════════════════════ -->
     <div id="page-seo" class="content page">
       <div class="kpi-grid">
-        <div class="kpi-card blue" id="kpi-impressions">
+        <div class="kpi-card blue" id="kpi-impressions" title="Total number of times your pages appeared in Google search results during this period. Does not mean they clicked — just that your page was shown.">
           <div class="kpi-header"><div class="kpi-label">Total Impressions</div><div class="kpi-icon blue">👁</div></div>
           <div class="kpi-value">1.24M</div>
           <div class="kpi-delta up">▲ 9.2%</div>
         </div>
-        <div class="kpi-card green" id="kpi-position">
-          <div class="kpi-header"><div class="kpi-label">Avg. Position</div><div class="kpi-icon green">📍</div></div>
+        <div class="kpi-card green" id="kpi-position" title="Your average ranking position in Google search results. Position 1 is the top result. Lower number is better — position 5 is better than position 15.">
+          <div class="kpi-header"><div class="kpi-label">Avg. Position in Google</div><div class="kpi-icon green">📍</div></div>
           <div class="kpi-value">14.3</div>
           <div class="kpi-delta up">▲ improved 2.1</div>
         </div>
-        <div class="kpi-card red" id="kpi-ctr">
-          <div class="kpi-header"><div class="kpi-label">Avg. CTR</div><div class="kpi-icon red">→</div></div>
+        <div class="kpi-card red" id="kpi-ctr" title="Out of everyone who saw your pages in Google search results, what percentage actually clicked through to your site. Industry average is 2-5%.">
+          <div class="kpi-header"><div class="kpi-label">Avg. Click-Through Rate</div><div class="kpi-icon red">→</div></div>
           <div class="kpi-value">2.8%</div>
-          <div class="kpi-delta dn">▼ 0.2pp</div>
+          <div class="kpi-delta dn">▼ down vs prior period</div>
         </div>
-        <div class="kpi-card purple" id="kpi-low-ctr">
+        <div class="kpi-card purple" id="kpi-low-ctr" title="Pages with more than 5,000 impressions but less than 2% click-through rate. These are pages Google shows frequently but visitors don't click — a sign the page title or description could be improved.">
           <div class="kpi-header"><div class="kpi-label">Low CTR Pages</div><div class="kpi-icon purple">⚠</div></div>
           <div class="kpi-value">38</div>
           <div class="kpi-delta dn">▲ needs attention</div>
@@ -878,7 +909,10 @@
         <div class="panel">
           <div class="panel-header">
             <div class="panel-title"><div class="dot amber"></div>High Impressions · Low CTR — Top Opportunities</div>
-            <span class="panel-tag blue">Search Console</span>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="font-size:11px;color:var(--text3)">Bar = impressions · % = click rate</span>
+              <span class="panel-tag blue">Search Console</span>
+            </div>
           </div>
           <div class="panel-body" id="seo-page-list">
             <div class="spinner"><div class="spinner-ring"></div>Loading SEO data...</div>
@@ -903,22 +937,22 @@
     ══════════════════════════════════════ -->
     <div id="page-merch" class="content page">
       <div class="kpi-grid">
-        <div class="kpi-card blue" id="kpi-merch-topcategory">
+        <div class="kpi-card blue" id="kpi-merch-topcategory" title="The highest-revenue product category for the selected period from Magento orders. The delta shows change vs the equal prior period.">
           <div class="kpi-header"><div class="kpi-label">Top Category Revenue</div><div class="kpi-icon blue">📦</div></div>
           <div class="kpi-value">—</div>
           <div class="kpi-delta neu">Loading...</div>
         </div>
-        <div class="kpi-card green" id="kpi-merch-topproduct">
-          <div class="kpi-header"><div class="kpi-label">Top Product Last Month</div><div class="kpi-icon green">⭐</div></div>
+        <div class="kpi-card green" id="kpi-merch-topproduct" title="The single highest-revenue product by SKU for the selected period, from Magento order line items.">
+          <div class="kpi-header"><div class="kpi-label">Top Product This Period</div><div class="kpi-icon green">⭐</div></div>
           <div class="kpi-value">—</div>
           <div class="kpi-delta neu">Loading...</div>
         </div>
-        <div class="kpi-card red" id="kpi-merch-dormant">
+        <div class="kpi-card red" id="kpi-merch-dormant" title="Products that were top sellers last month but have zero orders so far this month. Could indicate stock issues, visibility problems, or seasonal shifts.">
           <div class="kpi-header"><div class="kpi-label">Dormant Top Sellers</div><div class="kpi-icon red">⚠️</div></div>
           <div class="kpi-value">—</div>
           <div class="kpi-delta neu">Strong last month, 0 orders this month</div>
         </div>
-        <div class="kpi-card purple" id="kpi-merch-categories">
+        <div class="kpi-card purple" id="kpi-merch-categories" title="Total number of product categories with revenue recorded in Magento for the selected period.">
           <div class="kpi-header"><div class="kpi-label">Categories Tracked</div><div class="kpi-icon purple">🗂</div></div>
           <div class="kpi-value">—</div>
           <div class="kpi-delta neu">With revenue data</div>
@@ -957,6 +991,10 @@
           <div class="ai-badge">AI Summary</div>
           <div class="ai-title">Executive Brief · Live Data</div>
           <div class="ai-time" id="ai-generated-time">Loading...</div>
+          <button onclick="printAiSummary()" id="ai-print-btn" style="margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 12px;font-size:12px;color:var(--text2);cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:6px;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M3 4V1h7v3M3 9H1V5h11v4h-2M3 7h7v5H3z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+            Save as PDF
+          </button>
         </div>
         <div class="ai-body" id="ai-body">
           <div class="spinner"><div class="spinner-ring"></div>Generating summary from live data — this takes a few seconds...</div>
@@ -1089,6 +1127,16 @@ function applyCustomRange() {
   aiLoadedForDays   = null;
   oppsLoadedForDays = null;
   loadDashboard();
+}
+
+/* ─── PRINT AI SUMMARY AS PDF ─── */
+function printAiSummary() {
+  // Ensure AI page is active so print CSS targets it correctly
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-ai').classList.add('active');
+  window.print();
+  // Restore the AI page as active after print dialog closes
+  document.getElementById('page-ai').classList.add('active');
 }
 
 /* ─── NAVIGATION ─── */
@@ -1532,21 +1580,35 @@ async function loadDashboard() {
 function renderSeoPageList(pages) {
   const el = document.getElementById('seo-page-list');
   if (!el) return;
-  const top = pages.slice(0, 8);
-  const maxImpr = Math.max(...top.map(p => p.impressions), 1);
-  el.innerHTML = top.map((p, i) => {
-    const path  = p.url.replace('https://www.mockett.com','').replace('https://mockett.com','') || '/';
-    const imprK = p.impressions >= 1000 ? (p.impressions/1000).toFixed(1)+'K' : p.impressions;
-    const barW  = Math.round((p.impressions / maxImpr) * 100);
-    const ctrColor = p.ctr < 1.0 ? 'var(--red)' : p.ctr < 2.5 ? 'var(--amber)' : 'var(--green)';
-    return `<div class="seo-row">
-      <div class="seo-rank">${String(i+1).padStart(2,'0')}</div>
-      <div class="seo-page" title="${path}"><strong>${path}</strong></div>
-      <div class="seo-impr">${imprK}</div>
-      <div class="ctr-track"><div class="ctr-fill" style="width:${barW}%;background:${ctrColor}"></div></div>
-      <div class="seo-ctr" style="color:${ctrColor}">${p.ctr}%</div>
-    </div>`;
-  }).join('');
+
+  // Filter to genuine opportunities: high impressions, low CTR
+  const opps = pages
+    .filter(p => p.impressions >= 2000 && p.ctr < 3.0)
+    .slice(0, 8);
+
+  const maxImpr = Math.max(...opps.map(p => p.impressions), 1);
+
+  el.innerHTML = `
+    <div style="display:flex;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:2px;">
+      <div style="width:20px;flex-shrink:0;"></div>
+      <div style="flex:1;font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;">Page</div>
+      <div style="width:60px;text-align:right;font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;">Impr.</div>
+      <div style="width:56px;flex-shrink:0;"></div>
+      <div style="width:48px;text-align:right;font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;">CTR</div>
+    </div>
+    ${opps.map((p, i) => {
+      const path     = p.url.replace('https://www.mockett.com','').replace('https://mockett.com','') || '/';
+      const imprK    = p.impressions >= 1000 ? (p.impressions/1000).toFixed(1)+'K' : p.impressions;
+      const barW     = Math.round((p.impressions / maxImpr) * 100);
+      const ctrColor = p.ctr < 1.0 ? 'var(--red)' : p.ctr < 2.0 ? 'var(--amber)' : 'var(--green)';
+      return `<div class="seo-row">
+        <div class="seo-rank">${String(i+1).padStart(2,'0')}</div>
+        <div class="seo-page" title="${path}"><strong>${path}</strong></div>
+        <div class="seo-impr">${imprK}</div>
+        <div class="ctr-track"><div class="ctr-fill" style="width:${barW}%;background:${ctrColor}"></div></div>
+        <div class="seo-ctr" style="color:${ctrColor}">${p.ctr}%</div>
+      </div>`;
+    }).join('')}`;
 }
 
 /* ─── RENDER OPPORTUNITIES ─── */
