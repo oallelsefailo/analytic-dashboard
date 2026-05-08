@@ -72,15 +72,12 @@ def get_credentials():
         client_secret=td["client_secret"], scopes=td["scopes"],
     )
     try:
-        if not creds.valid or creds.expired:
-            old_token = td.get("token")
-            creds.refresh(Request())
-            if creds.token and creds.token != old_token:
-                td["token"] = creds.token
-                with open(OAUTH_TOKEN, "w") as f:
-                    json.dump(td, f, indent=2)
+        creds.refresh(Request())
+        td["token"] = creds.token
+        with open(OAUTH_TOKEN, "w") as f:
+            json.dump(td, f, indent=2)
     except Exception:
-        logger.exception("OAuth token refresh failed; using existing token if accepted by Google")
+        logger.exception("OAuth token refresh failed; using existing token")
     return creds
 
 def get_ga4_credentials():
