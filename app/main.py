@@ -173,13 +173,6 @@ def api_error(e):
     logger.exception("API request failed")
     raise HTTPException(500, detail="Dashboard data is unavailable for this request.")
 
-def rolling_30():
-    end        = date.today() - timedelta(days=1)
-    start      = end - timedelta(days=29)
-    prev_end   = start - timedelta(days=1)
-    prev_start = prev_end - timedelta(days=29)
-    return start, end, prev_start, prev_end
-
 def pct_delta(c, p):
     if not p: return None
     return round(((c - p) / p) * 100, 1)
@@ -645,6 +638,9 @@ def magento_top_products(days: int = 30, start_date: Optional[str] = None, end_d
 @app.get("/api/magento/dormant-top-sellers")
 def magento_dormant_top_sellers():
     """
+    Legacy calendar-month endpoint. Kept for compatibility with older dashboard
+    panels; the primary merchandising workflow now uses selected-period drop-offs.
+
     Products that were top sellers last month but have zero orders so far this month.
     Signals potential availability, visibility, or featured placement issues.
     """
@@ -671,7 +667,15 @@ def magento_dormant_top_sellers():
                 top_lm = cur.fetchall()
 
                 if not top_lm:
-                    return {"products": []}
+                    return {
+                        "mode": "legacy_calendar_month",
+                        "period": {
+                            "previous_month_start": lm_start.isoformat(),
+                            "previous_month_end": lm_end.isoformat(),
+                            "current_month_start": cm_start.isoformat(),
+                        },
+                        "products": [],
+                    }
 
                 top_ids = [r["product_id"] for r in top_lm]
 
@@ -693,7 +697,15 @@ def magento_dormant_top_sellers():
             {"name": r["name"], "sku": r["sku"], "revenue_last_month": round(float(r["revenue_lm"]), 2)}
             for r in top_lm if r["product_id"] not in sold_this_month
         ]
-        return {"products": dormant[:10]}
+        return {
+            "mode": "legacy_calendar_month",
+            "period": {
+                "previous_month_start": lm_start.isoformat(),
+                "previous_month_end": lm_end.isoformat(),
+                "current_month_start": cm_start.isoformat(),
+            },
+            "products": dormant[:10],
+        }
 
     except Exception as e:
         api_error(e)
@@ -1116,10 +1128,12 @@ Return ONLY valid JSON, no markdown:
 def magento_health():
     try:
         conn = get_magento_conn()
-        with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) AS order_count FROM sales_order")
-            row = cur.fetchone()
-        conn.close()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) AS order_count FROM sales_order")
+                row = cur.fetchone()
+        finally:
+            conn.close()
         return {"status": "connected", "total_orders": row["order_count"]}
     except Exception as e:
         api_error(e)

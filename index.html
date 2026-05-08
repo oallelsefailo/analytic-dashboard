@@ -1065,11 +1065,11 @@ function toggleTheme() {
 
 function rebuildChartsOnly() {
   // Redraw existing charts with current theme colors — no API calls
-  if (revChartInst)    { revChartInst.update(); }
-  if (donutChartInst)  { donutChartInst.update(); }
-  if (catChartInst)    { catChartInst.update(); }
-  if (seoChartInst)    { seoChartInst.update(); }
-  if (merchChartInst)  { merchChartInst.update(); }
+  [revChartInst, donutChartInst, catChartInst, seoChartInst, merchChartInst].forEach(chart => {
+    if (!chart) return;
+    applyChartTheme(chart);
+    chart.update();
+  });
 }
 
 // Apply saved theme on load
@@ -1325,22 +1325,35 @@ function nav(id, el) {
 }
 
 /* ─── CHART HELPERS ─── */
-const GRID  = 'rgba(255,255,255,0.05)';
-const TICKS = '#5a6a85';
-const TT    = { backgroundColor:'#1a2030', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#e8edf5', bodyColor:'#8b9ab5', padding:10, cornerRadius:8 };
+function chartTheme() {
+  const light = document.body.classList.contains('light');
+  return {
+    grid: light ? 'rgba(17,24,39,0.08)' : 'rgba(255,255,255,0.05)',
+    ticks: light ? '#4b5563' : '#5a6a85',
+    tooltip: {
+      backgroundColor: light ? '#ffffff' : '#1a2030',
+      borderColor: light ? 'rgba(17,24,39,0.14)' : 'rgba(255,255,255,0.1)',
+      borderWidth: 1,
+      titleColor: light ? '#111827' : '#e8edf5',
+      bodyColor: light ? '#4b5563' : '#8b9ab5',
+      padding: 10,
+      cornerRadius: 8,
+    },
+  };
+}
 
-function days30Labels() {
-  return Array.from({length:30}, (_,i) => {
-    const d = new Date(2026, 3, 7 + i);
-    return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+function applyChartTheme(chart) {
+  const theme = chartTheme();
+  const scales = chart.options.scales || {};
+  Object.values(scales).forEach(scale => {
+    if (scale.grid && scale.grid.display !== false) scale.grid.color = theme.grid;
+    if (scale.ticks) scale.ticks.color = theme.ticks;
+    if (scale.title) scale.title.color = theme.ticks;
   });
+  if (chart.options.plugins && chart.options.plugins.tooltip) {
+    Object.assign(chart.options.plugins.tooltip, theme.tooltip);
+  }
 }
-
-function wave(n, base, amp) {
-  return Array.from({length:n}, (_,i) => Math.round(base + Math.sin(i*0.55)*amp + (Math.random()-0.4)*amp*0.4));
-}
-
-const L30 = days30Labels();
 
 /* ─── CHART INSTANCES (kept in scope so we can update them) ─── */
 let revChartInst, donutChartInst, catChartInst, seoChartInst, merchChartInst;
@@ -1382,6 +1395,7 @@ function buildRevChart(labels, revenue, sessions) {
   const ctx = document.getElementById('revChart');
   if (!ctx) return;
   if (revChartInst) revChartInst.destroy();
+  const theme = chartTheme();
   revChartInst = new Chart(ctx, {
     type: 'line',
     data: {
@@ -1393,11 +1407,11 @@ function buildRevChart(labels, revenue, sessions) {
     },
     options: {
       responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, tooltip:{ ...TT, callbacks:{ label: ctx => ctx.dataset.label==='Revenue ($)' ? '$'+ctx.raw.toLocaleString() : ctx.raw+' sessions' } } },
+      plugins:{ legend:{display:false}, tooltip:{ ...theme.tooltip, callbacks:{ label: ctx => ctx.dataset.label==='Revenue ($)' ? '$'+ctx.raw.toLocaleString() : ctx.raw+' sessions' } } },
       scales: {
-        x:  { grid:{color:GRID}, ticks:{color:TICKS, font:{size:11}, maxTicksLimit:8} },
-        y:  { position:'left',  grid:{color:GRID}, ticks:{color:TICKS, font:{size:11}, callback:v=>'$'+(v/1000).toFixed(0)+'K'} },
-        y1: { position:'right', grid:{display:false}, ticks:{color:TICKS, font:{size:11}} }
+        x:  { grid:{color:theme.grid}, ticks:{color:theme.ticks, font:{size:11}, maxTicksLimit:8} },
+        y:  { position:'left',  grid:{color:theme.grid}, ticks:{color:theme.ticks, font:{size:11}, callback:v=>'$'+(v/1000).toFixed(0)+'K'} },
+        y1: { position:'right', grid:{display:false}, ticks:{color:theme.ticks, font:{size:11}} }
       }
     }
   });
@@ -1408,17 +1422,20 @@ function buildDonutChart(sources) {
   const ctx = document.getElementById('donutChart');
   if (!ctx) return;
   if (donutChartInst) donutChartInst.destroy();
+  const theme = chartTheme();
   donutChartInst = new Chart(ctx, {
     type: 'doughnut',
     data: { labels: sources.map(s=>s.name), datasets:[{ data:sources.map(s=>s.pct), backgroundColor:CHART_COLORS.donut, borderWidth:0, hoverOffset:4 }] },
-    options: { responsive:true, maintainAspectRatio:false, cutout:'72%', plugins:{legend:{display:false}, tooltip:TT} }
+    options: { responsive:true, maintainAspectRatio:false, cutout:'72%', plugins:{legend:{display:false}, tooltip:theme.tooltip} }
   });
+  const centerValue = document.querySelector('.donut-val');
+  const centerLabel = document.querySelector('.donut-sub');
   if (sources.length) {
-    document.querySelector('.donut-val').textContent = sources[0].pct + '%';
-    document.querySelector('.donut-sub').textContent = sources[0].name.toLowerCase();
+    if (centerValue) centerValue.textContent = sources[0].pct + '%';
+    if (centerLabel) centerLabel.textContent = sources[0].name.toLowerCase();
   } else {
     document.querySelector('.donut-val').textContent = '—';
-    document.querySelector('.donut-sub').textContent = 'unavailable';
+    if (centerLabel) centerLabel.textContent = 'unavailable';
   }
   const EXPLAIN = { 'Organic':'Found you via Google search', 'Direct':'Typed your URL or used a bookmark', 'Referral':'Clicked a link on another website', 'Paid Search':'Clicked a paid ad', 'Email':'Clicked a link in an email', 'Social':'Came from social media', 'Unassigned':'Source could not be identified' };
   const legend = document.querySelector('.legend-list');
@@ -1436,6 +1453,7 @@ function buildCatChart(categories) {
   const ctx = document.getElementById('catChart');
   if (!ctx) return;
   if (catChartInst) catChartInst.destroy();
+  const theme = chartTheme();
   // Chart shows top 10 only — trend table shows all 25
   const chartCats = categories.slice(0, 10);
   catChartInst = new Chart(ctx, {
@@ -1449,11 +1467,11 @@ function buildCatChart(categories) {
       responsive:true, maintainAspectRatio:false,
       plugins:{
         legend:{display:false},
-        tooltip:{...TT, callbacks:{label:ctx=>'$'+Number(ctx.raw).toLocaleString(undefined,{maximumFractionDigits:0})}}
+        tooltip:{...theme.tooltip, callbacks:{label:ctx=>'$'+Number(ctx.raw).toLocaleString(undefined,{maximumFractionDigits:0})}}
       },
       scales: {
-        x:{ grid:{display:false}, ticks:{color:TICKS, font:{size:10}, maxRotation:30} },
-        y:{ grid:{color:GRID}, ticks:{color:TICKS, font:{size:11}, callback: function(v) {
+        x:{ grid:{display:false}, ticks:{color:theme.ticks, font:{size:10}, maxRotation:30} },
+        y:{ grid:{color:theme.grid}, ticks:{color:theme.ticks, font:{size:11}, callback: function(v) {
           if (v >= 1000000) return '$' + (v/1000000).toFixed(1) + 'M';
           if (v >= 1000)    return '$' + (v/1000).toFixed(0) + 'K';
           return '$' + v;
@@ -1550,6 +1568,7 @@ function buildSeoChart(pages) {
   const ctx = document.getElementById('seoChart');
   if (!ctx) return;
   if (seoChartInst) seoChartInst.destroy();
+  const theme = chartTheme();
   const scatterData = pages.map(p => ({
     x: parseFloat((p.impressions/1000).toFixed(1)),
     y: p.ctr,
@@ -1563,14 +1582,14 @@ function buildSeoChart(pages) {
       responsive:true, maintainAspectRatio:false,
       plugins:{
         legend:{display:false},
-        tooltip:{...TT, callbacks:{
+        tooltip:{...theme.tooltip, callbacks:{
           title: items => items[0].raw.url,
           label: ctx => `${ctx.raw.x}K impressions · ${ctx.raw.y}% CTR`
         }}
       },
       scales:{
-        x:{title:{display:true,text:'Impressions (K)',color:TICKS,font:{size:11}}, grid:{color:GRID}, ticks:{color:TICKS,font:{size:11},callback:v=>v+'K'}},
-        y:{title:{display:true,text:'CTR (%)',color:TICKS,font:{size:11}}, grid:{color:GRID}, ticks:{color:TICKS,font:{size:11},callback:v=>v+'%'}}
+        x:{title:{display:true,text:'Impressions (K)',color:theme.ticks,font:{size:11}}, grid:{color:theme.grid}, ticks:{color:theme.ticks,font:{size:11},callback:v=>v+'K'}},
+        y:{title:{display:true,text:'CTR (%)',color:theme.ticks,font:{size:11}}, grid:{color:theme.grid}, ticks:{color:theme.ticks,font:{size:11},callback:v=>v+'%'}}
       }
     }
   });
@@ -1581,6 +1600,7 @@ function buildMerchChart(products) {
   const ctx = document.getElementById('merchChart');
   if (!ctx) return;
   if (merchChartInst) merchChartInst.destroy();
+  const theme = chartTheme();
   merchChartInst = new Chart(ctx, {
     type:'bar',
     data:{
@@ -1592,7 +1612,7 @@ function buildMerchChart(products) {
       responsive:true, maintainAspectRatio:false,
       plugins:{
         legend:{display:false},
-        tooltip:{...TT, callbacks:{
+        tooltip:{...theme.tooltip, callbacks:{
           title: (items) => {
             const p = products[items[0].dataIndex];
             return p ? `${p.name} (${p.sku})` : '';
@@ -1601,8 +1621,8 @@ function buildMerchChart(products) {
         }}
       },
       scales:{
-        x:{grid:{display:false}, ticks:{color:TICKS, font:{size:10}, maxRotation:45, minRotation:45}},
-        y:{grid:{color:GRID}, ticks:{color:TICKS, font:{size:11}, callback: v => {
+        x:{grid:{display:false}, ticks:{color:theme.ticks, font:{size:10}, maxRotation:45, minRotation:45}},
+        y:{grid:{color:theme.grid}, ticks:{color:theme.ticks, font:{size:11}, callback: v => {
           if (v>=1000000) return '$'+(v/1000000).toFixed(1)+'M';
           if (v>=1000)    return '$'+(v/1000).toFixed(0)+'K';
           return '$'+v;
