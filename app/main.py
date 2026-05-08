@@ -27,8 +27,10 @@ load_dotenv()
 
 app = FastAPI(title="Mockett AI Dashboard API")
 logger = logging.getLogger("mockett.analytics")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
-app.mount("/static", StaticFiles(directory="."), name="static")
+cors_origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if origin.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=cors_origins, allow_methods=["GET"], allow_headers=["Content-Type", "Authorization"])
+if os.path.isdir("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 def serve_dashboard():
@@ -56,15 +58,16 @@ def get_credentials():
         token_uri=td["token_uri"], client_id=td["client_id"],
         client_secret=td["client_secret"], scopes=td["scopes"],
     )
-    # Always refresh — token may be expired even if creds.expired is False
-    # because expiry isn't stored in the JSON file
     try:
-        creds.refresh(Request())
-        td["token"] = creds.token
-        with open(OAUTH_TOKEN, "w") as f:
-            json.dump(td, f, indent=2)
+        if not creds.valid or creds.expired:
+            old_token = td.get("token")
+            creds.refresh(Request())
+            if creds.token and creds.token != old_token:
+                td["token"] = creds.token
+                with open(OAUTH_TOKEN, "w") as f:
+                    json.dump(td, f, indent=2)
     except Exception:
-        pass  # If refresh fails, try with existing token
+        logger.exception("OAuth token refresh failed; using existing token if accepted by Google")
     return creds
 
 def get_ga4_client():
@@ -126,9 +129,9 @@ def period_context(days: int = 30, start_date: Optional[str] = None, end_date: O
     period_days = (end - start).days + 1
     prev_end = start - timedelta(days=1)
     prev_start = prev_end - timedelta(days=period_days - 1)
-    if period_label:
-        label = period_label
-        period_type = "custom" if start_date or end_date else "preset"
+    if start_date or end_date:
+        label = "Custom Range"
+        period_type = "custom"
     elif period_days == 90:
         label = "Last 90 Days"
         period_type = "rolling"
@@ -221,35 +224,157 @@ BROAD_WORK_PATTERNS = [
 ]
 
 def has_numeric_citation(text: str):
-    return bool(re.search(r"\d", text or ""))
+    value = text or ""
+    return bool(re.search(r"(\$\s?\d|\d[\d,.]*\s?(?:%|sessions?|impressions?|clicks?|ctr|revenue|pages?|products?|categories?|orders?|K|M)\b)", value, re.IGNORECASE))
 
 def has_broad_work_language(text: str):
     lower = (text or "").lower()
     return any(re.search(pattern, lower) for pattern in BROAD_WORK_PATTERNS)
 
-def clean_ai_items(items, max_count, allowed_actions=ALLOWED_AI_ACTIONS):
+def clean_ai_items_with_metadata(items, max_count, allowed_actions=ALLOWED_AI_ACTIONS):
     cleaned = []
     seen_actions = set()
+    removed = 0
+    reasons = {"unsupported_action": 0, "duplicate_action": 0, "missing_metric": 0, "broad_language": 0, "invalid_shape": 0}
     for item in items or []:
         if not isinstance(item, dict):
+            removed += 1
+            reasons["invalid_shape"] += 1
             continue
         action = item.get("action")
         description = item.get("desc") or item.get("description") or ""
         title = item.get("title") or ""
         if action not in allowed_actions:
+            removed += 1
+            reasons["unsupported_action"] += 1
             continue
         if action in seen_actions:
+            removed += 1
+            reasons["duplicate_action"] += 1
             continue
         if not has_numeric_citation(f"{title} {description}"):
+            removed += 1
+            reasons["missing_metric"] += 1
             continue
         if has_broad_work_language(f"{title} {description}"):
+            removed += 1
+            reasons["broad_language"] += 1
             continue
         seen_actions.add(action)
         item["action_label"] = ACTION_LABELS.get(action, "Focused review")
         cleaned.append(item)
         if len(cleaned) >= max_count:
             break
-    return cleaned
+    return cleaned, {"input_count": len(items or []), "returned": len(cleaned), "removed": removed, "reasons": reasons}
+
+def clean_ai_items(items, max_count, allowed_actions=ALLOWED_AI_ACTIONS):
+    return clean_ai_items_with_metadata(items, max_count, allowed_actions)[0]
+
+def period_payload(ctx):
+    return {
+        "label": ctx["label"],
+        "start_date": ctx["start_date"],
+        "end_date": ctx["end_date"],
+        "days": ctx["days"],
+        "type": ctx["type"],
+        "mode": ctx["mode"],
+        "comparison": ctx["comparison"],
+    }
+
+def deterministic_summary(metrics, sources, ctx, reason="openai_unavailable"):
+    insights = []
+    ga4 = metrics.get("ga4")
+    gsc = metrics.get("gsc")
+    if ga4:
+        current = ga4.get("current", {})
+        insights.append({
+            "title": "GA4 ecommerce revenue snapshot",
+            "type": "info",
+            "description": f"GA4 shows ${current.get('revenue', 0):,.0f} ecommerce revenue and {current.get('sessions', 0):,} sessions for the selected period. Use this as a source-grounded pulse while AI text generation is unavailable.",
+        })
+    if gsc:
+        insights.append({
+            "title": "Search Console visibility snapshot",
+            "type": "info",
+            "description": f"Search Console shows {gsc.get('impressions', 0):,} impressions, {gsc.get('ctr', 0)}% CTR, and average position {gsc.get('position', 0)} for the selected period. Review Search Console directly for page-level detail if needed.",
+        })
+    categories = metrics.get("categories") or []
+    if categories:
+        top = categories[0]
+        insights.append({
+            "title": "Magento category order-line snapshot",
+            "type": "info",
+            "description": f"{top.get('name', 'The top category')} has ${top.get('revenue', 0):,.0f} in Magento parent order-line revenue for the selected period. Category totals can overlap when products belong to multiple categories.",
+        })
+    if not insights:
+        insights.append({
+            "title": "Data sources unavailable",
+            "type": "info",
+            "description": "GA4, Search Console, and Magento data could not be retrieved for this selected period. Check the source connections and retry the dashboard load.",
+        })
+    return {
+        "insights": insights[:4],
+        "generated_at": datetime.now().isoformat(),
+        "period": period_payload(ctx),
+        "data_snapshot": {
+            "sessions": ga4["current"]["sessions"] if ga4 else None,
+            "revenue": ga4["current"]["revenue"] if ga4 else None,
+            "impressions": gsc["impressions"] if gsc else None,
+            "ctr": gsc["ctr"] if gsc else None,
+        },
+        "sources": sources,
+        "partial_data": any(s["status"] != "available" for s in sources.values()),
+        "fallback": True,
+        "fallback_reason": reason,
+        "filtered_items": {"input_count": 0, "returned": len(insights[:4]), "removed": 0, "reasons": {}},
+    }
+
+def deterministic_opportunities(signals, sources, ctx, reason="openai_unavailable"):
+    opportunities = []
+    for page in signals.get("gsc_pages", []):
+        if page.get("impressions", 0) > 5000 and page.get("ctr", 100) < 2.0:
+            opportunities.append({
+                "icon": "search",
+                "priority": "med",
+                "title": "Review a high-impression low-CTR page",
+                "desc": f"{page.get('url', 'A Search Console page')} has {page.get('impressions', 0):,} impressions and {page.get('ctr', 0)}% CTR in the selected period. Review that page's search snippet and visible page copy for alignment.",
+                "action": "review_search_snippet_alignment",
+                "action_label": ACTION_LABELS["review_search_snippet_alignment"],
+            })
+            break
+    for product in signals.get("product_dropoffs", []):
+        if product.get("revenue_drop", 0) >= 250:
+            opportunities.append({
+                "icon": "box",
+                "priority": "med",
+                "title": "Review a product revenue drop-off",
+                "desc": f"{product.get('sku', 'A product')} fell from ${product.get('previous_revenue', 0):,.0f} to ${product.get('current_revenue', 0):,.0f} in Magento order-line revenue. Check the product page, placement, and related-product context for this item only.",
+                "action": "review_related_products",
+                "action_label": ACTION_LABELS["review_related_products"],
+            })
+            break
+    for category in signals.get("categories", []):
+        if category.get("delta") is not None and category.get("delta") <= -25:
+            opportunities.append({
+                "icon": "category",
+                "priority": "low",
+                "title": "Review a declining category signal",
+                "desc": f"{category.get('name', 'A category')} is at ${category.get('revenue', 0):,.0f} Magento order-line revenue with a {category.get('delta')}% change versus the prior period. Review featured products or category navigation for this category only.",
+                "action": "review_featured_products",
+                "action_label": ACTION_LABELS["review_featured_products"],
+            })
+            break
+    return {
+        "opportunities": opportunities[:5],
+        "generated_at": datetime.now().isoformat(),
+        "period": period_payload(ctx),
+        "sources": sources,
+        "partial_data": any(s["status"] != "available" for s in sources.values()),
+        "total": len(opportunities[:5]),
+        "fallback": True,
+        "fallback_reason": reason,
+        "filtered_items": {"input_count": 0, "returned": len(opportunities[:5]), "removed": 0, "reasons": {}},
+    }
 
 def lm_dates():
     today    = date.today()
@@ -282,7 +407,7 @@ def ga4_sessions_revenue(days: int = 30, start_date: Optional[str] = None, end_d
             labels.append(f"{d.month}/{d.day}")
             sessions.append(int(row.metric_values[0].value))
             revenue.append(round(float(row.metric_values[1].value), 2))
-        return {"labels": labels, "sessions": sessions, "revenue": revenue}
+        return {"period": {"start_date": start.isoformat(), "end_date": end.isoformat()}, "labels": labels, "sessions": sessions, "revenue": revenue}
     except Exception as e:
         api_error(e)
 
@@ -370,7 +495,7 @@ def ga4_traffic_sources(days: int = 30, start_date: Optional[str] = None, end_da
             name = row.dimension_values[0].value
             sess = int(row.metric_values[0].value)
             sources.append({"name": name, "sessions": sess, "pct": round(sess/total*100, 1) if total else 0})
-        return {"sources": sources, "total": total}
+        return {"period": {"start_date": start.isoformat(), "end_date": end.isoformat()}, "sources": sources, "total": total}
     except Exception as e:
         api_error(e)
 
@@ -378,7 +503,7 @@ def ga4_traffic_sources(days: int = 30, start_date: Optional[str] = None, end_da
 @app.get("/api/ga4/search-terms")
 def ga4_search_terms(days: int = 30, start_date: Optional[str] = None, end_date: Optional[str] = None, limit: int = 40):
     """
-    Live on-site search terms from GA4/Klevu. Blank non-search rows are filtered,
+    On-site search terms from GA4. Blank non-search rows are filtered,
     identical terms are grouped case-insensitively, and SKU-like searches display
     in uppercase without merging meaningful suffixes such as DP128/9.
     """
@@ -463,6 +588,7 @@ def gsc_summary(days: int = 30, start_date: Optional[str] = None, end_date: Opti
             "clicks":      int(row.get("clicks", 0)),
             "ctr":         round(row.get("ctr", 0) * 100, 2),
             "position":    round(row.get("position", 0), 1),
+            "period": {"start_date": start.isoformat(), "end_date": end.isoformat()},
         }
     except Exception as e:
         api_error(e)
@@ -495,8 +621,10 @@ def gsc_pages(days: int = 30, limit: int = 20, start_date: Optional[str] = None,
         return {
             "pages": pages,
             "low_ctr_count": low_ctr_count,
+            "period": {"start_date": start.isoformat(), "end_date": end.isoformat()},
             "metric_notes": {
                 "low_ctr_count": f"Count of fetched top {limit} Search Console pages with more than 5,000 impressions and less than 2% CTR.",
+                "sample": f"Fetched top {limit} pages by impressions from Search Console, not a sitewide count.",
             },
         }
     except Exception as e:
@@ -593,7 +721,7 @@ def magento_category_revenue(days: int = 30, start_date: Optional[str] = None, e
             "end_date": ctx["end_date"],
             "comparison": ctx["comparison"],
         }, "metric_notes": {
-            "revenue": "Magento parent order-line revenue attributed to each level-2 category. Products in multiple categories may appear under each assigned category.",
+            "revenue": "Magento parent order-line revenue attributed to each level-2 category. Products assigned to multiple level-2 categories may appear in each category, so category revenue totals should not be added together.",
         }, "categories": categories}
     except Exception as e:
         api_error(e)
@@ -669,6 +797,7 @@ def magento_dormant_top_sellers():
                 if not top_lm:
                     return {
                         "mode": "legacy_calendar_month",
+                        "deprecated": True,
                         "period": {
                             "previous_month_start": lm_start.isoformat(),
                             "previous_month_end": lm_end.isoformat(),
@@ -699,6 +828,9 @@ def magento_dormant_top_sellers():
         ]
         return {
             "mode": "legacy_calendar_month",
+            "deprecated": True,
+            "replacement": "/api/magento/product-dropoffs",
+            "metric_notes": {"status": "Legacy calendar-month endpoint kept for compatibility. Selected-period product drop-offs are the primary merchandising watchlist."},
             "period": {
                 "previous_month_start": lm_start.isoformat(),
                 "previous_month_end": lm_end.isoformat(),
@@ -857,7 +989,7 @@ Comparison period: {ctx['comparison']['start_date']} to {ctx['comparison']['end_
 
 RAW DATA:
 
-GSC PAGES FOR SELECTED PERIOD (impressions, clicks, CTR, position):
+FETCHED TOP SEARCH CONSOLE PAGES FOR SELECTED PERIOD (impressions, clicks, CTR, position):
 {json.dumps(signals['gsc_pages'], indent=2)}
 
 MAGENTO CATEGORY REVENUE (selected period revenue, delta vs prior equivalent period):
@@ -914,7 +1046,7 @@ Return ONLY valid JSON, no markdown:
         raw = raw.strip()
 
         result = json.loads(raw)
-        result["opportunities"] = clean_ai_items(result.get("opportunities"), 5)
+        result["opportunities"], filter_meta = clean_ai_items_with_metadata(result.get("opportunities"), 5)
         result["generated_at"] = datetime.now().isoformat()
         result["period"] = {
             "label": ctx["label"],
@@ -928,9 +1060,19 @@ Return ONLY valid JSON, no markdown:
         result["sources"] = sources
         result["partial_data"] = any(s["status"] != "available" for s in sources.values())
         result["total"] = len(result.get("opportunities", []))
+        result["filtered_items"] = filter_meta
+        result["fallback"] = False
         return result
 
+    except json.JSONDecodeError:
+        logger.exception("OpenAI opportunities response was not valid JSON")
+        return deterministic_opportunities(signals, sources, ctx, "invalid_ai_json")
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("OpenAI opportunities generation failed")
+        if "ctx" in locals() and "signals" in locals() and "sources" in locals():
+            return deterministic_opportunities(signals, sources, ctx, "openai_unavailable")
         api_error(e)
 
 
@@ -1014,7 +1156,7 @@ def ai_summary(days: int = 30, start_date: Optional[str] = None, end_date: Optio
         if metrics["product_dropoffs"]:
             sections.append(f"PRODUCT DROP-OFFS VS PRIOR EQUIVALENT PERIOD:\n{json.dumps(metrics['product_dropoffs'], indent=2)}")
         if metrics["low_ctr_pages"]:
-            sections.append(f"PAGES WITH HIGH IMPRESSIONS BUT LOW CTR:\n{json.dumps(metrics['low_ctr_pages'], indent=2)}")
+            sections.append(f"FETCHED TOP SEARCH CONSOLE PAGES WITH HIGH IMPRESSIONS BUT LOW CTR:\n{json.dumps(metrics['low_ctr_pages'], indent=2)}")
 
         # If no data at all, return a friendly message without calling OpenAI
         if not sections:
@@ -1022,8 +1164,7 @@ def ai_summary(days: int = 30, start_date: Optional[str] = None, end_date: Optio
                 "insights": [{
                     "title": "Data sources unavailable",
                     "type": "info",
-                    "description": "GA4, Search Console, and Magento data could not be retrieved for this period. Please check your data source connections and try again.",
-                    "action": "review_category_navigation"
+                    "description": "GA4, Search Console, and Magento data could not be retrieved for this period. Please check your data source connections and try again."
                 }],
                 "generated_at": datetime.now().isoformat(),
                 "period": {
@@ -1038,6 +1179,9 @@ def ai_summary(days: int = 30, start_date: Optional[str] = None, end_date: Optio
                 "data_snapshot": {"sessions": None, "revenue": None, "impressions": None, "ctr": None},
                 "sources": sources,
                 "partial_data": True,
+                "fallback": True,
+                "fallback_reason": "all_sources_unavailable",
+                "filtered_items": {"input_count": 0, "returned": 1, "removed": 0, "reasons": {}},
             }
 
         prompt = f"""You are a business intelligence assistant for Mockett.com, which sells office hardware (grommets, power solutions, drawer pulls, cable management).
@@ -1095,7 +1239,7 @@ Return ONLY valid JSON, no markdown:
         raw = raw.strip()
 
         result = json.loads(raw)
-        result["insights"] = clean_ai_items(result.get("insights"), 4)
+        result["insights"], filter_meta = clean_ai_items_with_metadata(result.get("insights"), 4)
         result["generated_at"] = datetime.now().isoformat()
         result["period"] = {
             "label": ctx["label"],
@@ -1114,9 +1258,19 @@ Return ONLY valid JSON, no markdown:
         }
         result["sources"] = sources
         result["partial_data"] = any(s["status"] != "available" for s in sources.values())
+        result["filtered_items"] = filter_meta
+        result["fallback"] = False
         return result
 
+    except json.JSONDecodeError:
+        logger.exception("OpenAI summary response was not valid JSON")
+        return deterministic_summary(metrics, sources, ctx, "invalid_ai_json")
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("OpenAI summary generation failed")
+        if "ctx" in locals() and "metrics" in locals() and "sources" in locals():
+            return deterministic_summary(metrics, sources, ctx, "openai_unavailable")
         api_error(e)
 
 
@@ -1141,9 +1295,11 @@ def magento_health():
 @app.get("/api/health")
 def health():
     return {
-        "status":       "ok",
-        "ga4_property": GA4_PROPERTY_ID,
-        "gsc_site":     GSC_SITE_URL,
-        "auth":         "oauth",
-        "token_file":   OAUTH_TOKEN,
+        "status": "ok",
+        "sources_configured": {
+            "ga4": bool(GA4_PROPERTY_ID),
+            "gsc": bool(GSC_SITE_URL),
+            "magento": bool(os.getenv("MYSQL_HOST")),
+            "openai": bool(os.getenv("OPENAI_API_KEY")),
+        },
     }
