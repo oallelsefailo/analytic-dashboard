@@ -263,11 +263,51 @@ def has_broad_work_language(text: str):
     lower = (text or "").lower()
     return any(re.search(pattern, lower) for pattern in BROAD_WORK_PATTERNS)
 
+def ai_summary_limit(ctx):
+    days = ctx.get("days", 30)
+    if days <= 45:
+        return 5
+    if days <= 120:
+        return 4
+    return 3
+
+def ai_opportunity_limit(ctx):
+    days = ctx.get("days", 30)
+    if days <= 45:
+        return 6
+    if days <= 120:
+        return 5
+    return 4
+
+def ai_count_guidance(ctx, item_type, max_count):
+    days = ctx.get("days", 30)
+    if days <= 45:
+        return f"For this short operational range, aim for 3-{max_count} {item_type} when the source data has distinct signals. Return fewer only when the data truly does not support more."
+    if days <= 120:
+        return f"For this quarterly-style range, return up to {max_count} {item_type}; 2-4 strong items are better than filler."
+    return f"For this long-term range, return up to {max_count} durable {item_type}; fewer is acceptable when signals are stable or repetitive."
+
+def normalize_ai_target(value: str):
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()[:120]
+
+def ai_item_dedupe_key(item):
+    action = item.get("action") or ""
+    target = (
+        item.get("target")
+        or item.get("review_target")
+        or item.get("url")
+        or item.get("sku")
+        or item.get("category")
+        or item.get("title")
+        or ""
+    )
+    return action, normalize_ai_target(target)
+
 def clean_ai_items_with_metadata(items, max_count, allowed_actions=ALLOWED_AI_ACTIONS):
     cleaned = []
-    seen_actions = set()
+    seen_items = set()
     removed = 0
-    reasons = {"unsupported_action": 0, "duplicate_action": 0, "missing_metric": 0, "broad_language": 0, "invalid_shape": 0}
+    reasons = {"unsupported_action": 0, "duplicate_target": 0, "missing_metric": 0, "broad_language": 0, "invalid_shape": 0}
     for item in items or []:
         if not isinstance(item, dict):
             removed += 1
@@ -280,9 +320,10 @@ def clean_ai_items_with_metadata(items, max_count, allowed_actions=ALLOWED_AI_AC
             removed += 1
             reasons["unsupported_action"] += 1
             continue
-        if action in seen_actions:
+        dedupe_key = ai_item_dedupe_key(item)
+        if dedupe_key in seen_items:
             removed += 1
-            reasons["duplicate_action"] += 1
+            reasons["duplicate_target"] += 1
             continue
         if not has_numeric_citation(f"{title} {description}"):
             removed += 1
@@ -292,7 +333,7 @@ def clean_ai_items_with_metadata(items, max_count, allowed_actions=ALLOWED_AI_AC
             removed += 1
             reasons["broad_language"] += 1
             continue
-        seen_actions.add(action)
+        seen_items.add(dedupe_key)
         item["action_label"] = ACTION_LABELS.get(action, "Focused review")
         cleaned.append(item)
         if len(cleaned) >= max_count:
@@ -314,6 +355,7 @@ def period_payload(ctx):
     }
 
 def deterministic_summary(metrics, sources, ctx, reason="openai_unavailable"):
+    max_count = ai_summary_limit(ctx)
     insights = []
     ga4 = metrics.get("ga4")
     gsc = metrics.get("gsc")
@@ -345,7 +387,7 @@ def deterministic_summary(metrics, sources, ctx, reason="openai_unavailable"):
             "description": "GA4, Search Console, and Magento data could not be retrieved for this selected period. Check the source connections and retry the dashboard load.",
         })
     return {
-        "insights": insights[:4],
+        "insights": insights[:max_count],
         "generated_at": datetime.now().isoformat(),
         "period": period_payload(ctx),
         "data_snapshot": {
@@ -358,10 +400,11 @@ def deterministic_summary(metrics, sources, ctx, reason="openai_unavailable"):
         "partial_data": any(s["status"] != "available" for s in sources.values()),
         "fallback": True,
         "fallback_reason": reason,
-        "filtered_items": {"input_count": 0, "returned": len(insights[:4]), "removed": 0, "reasons": {}},
+        "filtered_items": {"input_count": 0, "returned": len(insights[:max_count]), "removed": 0, "reasons": {}},
     }
 
 def deterministic_opportunities(signals, sources, ctx, reason="openai_unavailable"):
+    max_count = ai_opportunity_limit(ctx)
     opportunities = []
     for page in signals.get("gsc_pages", []):
         if page.get("impressions", 0) > 5000 and page.get("ctr", 100) < 2.0:
@@ -397,15 +440,15 @@ def deterministic_opportunities(signals, sources, ctx, reason="openai_unavailabl
             })
             break
     return {
-        "opportunities": opportunities[:5],
+        "opportunities": opportunities[:max_count],
         "generated_at": datetime.now().isoformat(),
         "period": period_payload(ctx),
         "sources": sources,
         "partial_data": any(s["status"] != "available" for s in sources.values()),
-        "total": len(opportunities[:5]),
+        "total": len(opportunities[:max_count]),
         "fallback": True,
         "fallback_reason": reason,
-        "filtered_items": {"input_count": 0, "returned": len(opportunities[:5]), "removed": 0, "reasons": {}},
+        "filtered_items": {"input_count": 0, "returned": len(opportunities[:max_count]), "removed": 0, "reasons": {}},
     }
 
 def lm_dates():
@@ -975,6 +1018,8 @@ def opportunities(days: int = 30, start_date: Optional[str] = None, end_date: Op
     """
     try:
         ctx = period_context(days, start_date, end_date, period_label)
+        max_opportunities = ai_opportunity_limit(ctx)
+        count_guidance = ai_count_guidance(ctx, "opportunities", max_opportunities)
         signals = {}
         sources = {
             "gsc": {"status": "unavailable"},
@@ -1021,7 +1066,7 @@ def opportunities(days: int = 30, start_date: Optional[str] = None, end_date: Op
 The web operations manager is a solo person — they cannot action dozens of items. Identify only the genuinely impactful opportunities from the data below. Focus on items where the gap between current performance and potential is large, specific, and actionable in a focused session.
 
 PERIOD CONTEXT:
-Opportunity count rule: Return up to 5 opportunities. Return fewer than 5 if the data does not show enough clear, focused signals. The goal is to flag where a human should look, not to create a work queue.
+Opportunity count rule: Return up to {max_opportunities} opportunities. {count_guidance} The goal is to flag where a human should look, not to create a work queue.
 Selected period label: {ctx['label']}
 Selected period type: {ctx['type']}
 Review mode: {ctx['mode']}
@@ -1061,12 +1106,13 @@ RULES:
 - Do not recommend broad SKU cleanup, catalog rewrites, title-template work, redesigns, or tasks that imply hundreds of edits
 - A low-CTR opportunity should name the specific page, category, or 1-3 item sample to review. It should not imply editing every SKU in that category.
 - action must come from this list ONLY: review_search_snippet_alignment, review_low_ctr_page_copy, review_featured_products, review_related_products, review_category_navigation
+- target must name the specific page, category, SKU, product, or signal being reviewed
 - priority must be: high, med, or low
 - icon must be one of: 📈 📄 📦 ⚠️ ⭐ 🔍
-- No two items should have identical action values if avoidable
+- Multiple opportunities may use the same action when they have clearly different targets. Do not repeat the same action for the same target.
 
 Return ONLY valid JSON, no markdown:
-{{"opportunities":[{{"icon":"emoji","priority":"high|med|low","title":"specific plain-English title","desc":"1-2 sentences with the specific number, why it matters, and the narrow review target","action":"approved_action"}}]}}"""
+{{"opportunities":[{{"icon":"emoji","priority":"high|med|low","title":"specific plain-English title","target":"specific page/category/SKU/product/signal","desc":"1-2 sentences with the specific number, why it matters, and the narrow review target","action":"approved_action"}}]}}"""
 
         oai = get_openai()
         resp = oai.chat.completions.create(
@@ -1075,7 +1121,7 @@ Return ONLY valid JSON, no markdown:
                 {"role": "system", "content": "Business intelligence assistant. Return only valid JSON. Be selective — quality over quantity."},
                 {"role": "user",   "content": prompt},
             ],
-            max_tokens=1500,
+            max_tokens=1800,
             temperature=0.2,
         )
 
@@ -1087,7 +1133,7 @@ Return ONLY valid JSON, no markdown:
         raw = raw.strip()
 
         result = json.loads(raw)
-        result["opportunities"], filter_meta = clean_ai_items_with_metadata(result.get("opportunities"), 5)
+        result["opportunities"], filter_meta = clean_ai_items_with_metadata(result.get("opportunities"), max_opportunities)
         result["generated_at"] = datetime.now().isoformat()
         result["period"] = {
             "label": ctx["label"],
@@ -1129,6 +1175,8 @@ def ai_summary(days: int = 30, start_date: Optional[str] = None, end_date: Optio
     """
     try:
         ctx = period_context(days, start_date, end_date, period_label)
+        max_insights = ai_summary_limit(ctx)
+        count_guidance = ai_count_guidance(ctx, "executive insights", max_insights)
         metrics = {}
         sources = {
             "ga4": {"status": "unavailable"},
@@ -1237,7 +1285,7 @@ Comparison period: {ctx['comparison']['start_date']} to {ctx['comparison']['end_
 BUSINESS DATA:
 {chr(10).join(sections)}
 
-Generate up to 4 executive insights based ONLY on the numbers above. Return fewer than 4 if the signals are weak or repetitive.
+Generate up to {max_insights} executive insights based ONLY on the numbers above. {count_guidance}
 
 STRICT RULES:
 - Respect the period context. Use "{ctx['label']}", "selected period", or the exact dates.
@@ -1255,11 +1303,12 @@ STRICT RULES:
 - Suggest exactly ONE action per insight from this approved list:
   review_search_snippet_alignment, review_low_ctr_page_copy, review_related_products,
   review_featured_products, review_category_navigation
-- No two insights should suggest the same action
+- Include a target field naming the specific metric, page, category, SKU, product, or signal being reviewed.
+- Multiple insights may use the same action when they have clearly different targets. Do not repeat the same action for the same target.
 - type must be one of: positive, warning, info, alert
 
 Return ONLY valid JSON, no markdown:
-{{"insights":[{{"title":"string","type":"positive|warning|info|alert","description":"2-3 sentences with specific numbers","action":"approved_action"}}]}}"""
+{{"insights":[{{"title":"string","type":"positive|warning|info|alert","target":"specific metric/page/category/SKU/product/signal","description":"2-3 sentences with specific numbers","action":"approved_action"}}]}}"""
 
         oai = get_openai()
         resp = oai.chat.completions.create(
@@ -1268,7 +1317,7 @@ Return ONLY valid JSON, no markdown:
                 {"role": "system", "content": "Business intelligence assistant. Return only valid JSON. No markdown fences."},
                 {"role": "user",   "content": prompt},
             ],
-            max_tokens=1200,
+            max_tokens=1600,
             temperature=0.25,
         )
 
@@ -1280,7 +1329,7 @@ Return ONLY valid JSON, no markdown:
         raw = raw.strip()
 
         result = json.loads(raw)
-        result["insights"], filter_meta = clean_ai_items_with_metadata(result.get("insights"), 4)
+        result["insights"], filter_meta = clean_ai_items_with_metadata(result.get("insights"), max_insights)
         result["generated_at"] = datetime.now().isoformat()
         result["period"] = {
             "label": ctx["label"],
