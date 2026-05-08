@@ -6,6 +6,7 @@ Run: uvicorn main:app --reload --port 8000
 import logging
 import os, json, re
 from datetime import date, timedelta, datetime
+from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -13,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
+from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google.analytics.data_v1beta import BetaAnalyticsDataClient
@@ -23,18 +25,22 @@ from googleapiclient.discovery import build
 import pymysql
 from openai import OpenAI
 
-load_dotenv()
+APP_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = APP_DIR.parent
+
+load_dotenv(PROJECT_ROOT / ".env")
 
 app = FastAPI(title="Mockett AI Dashboard API")
 logger = logging.getLogger("mockett.analytics")
 cors_origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if origin.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=cors_origins, allow_methods=["GET"], allow_headers=["Content-Type", "Authorization"])
-if os.path.isdir("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+STATIC_DIR = PROJECT_ROOT / "static"
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
 def serve_dashboard():
-    return FileResponse("index.html")
+    return FileResponse(PROJECT_ROOT / "index.html")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -43,7 +49,14 @@ def serve_dashboard():
 
 GA4_PROPERTY_ID = os.getenv("GA4_PROPERTY_ID", "312242279")
 GSC_SITE_URL    = os.getenv("GSC_SITE_URL", "https://www.mockett.com/")
-OAUTH_TOKEN     = "credentials/oauth-token.json"
+OAUTH_TOKEN     = PROJECT_ROOT / "credentials" / "oauth-token.json"
+GA4_SERVICE_ACCOUNT = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if GA4_SERVICE_ACCOUNT:
+    ga4_service_account_path = Path(GA4_SERVICE_ACCOUNT)
+    if not ga4_service_account_path.is_absolute():
+        ga4_service_account_path = PROJECT_ROOT / ga4_service_account_path
+else:
+    ga4_service_account_path = None
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -70,8 +83,25 @@ def get_credentials():
         logger.exception("OAuth token refresh failed; using existing token if accepted by Google")
     return creds
 
+def get_ga4_credentials():
+    if ga4_service_account_path and ga4_service_account_path.exists():
+        return service_account.Credentials.from_service_account_file(
+            ga4_service_account_path,
+            scopes=["https://www.googleapis.com/auth/analytics.readonly"],
+        )
+    return get_credentials()
+
 def get_ga4_client():
-    return BetaAnalyticsDataClient(credentials=get_credentials())
+    return BetaAnalyticsDataClient(credentials=get_ga4_credentials())
+
+def run_ga4_report(request: RunReportRequest):
+    try:
+        return get_ga4_client().run_report(request)
+    except Exception:
+        if ga4_service_account_path and ga4_service_account_path.exists():
+            logger.exception("GA4 service account request failed; retrying with OAuth token")
+            return BetaAnalyticsDataClient(credentials=get_credentials()).run_report(request)
+        raise
 
 def get_gsc_service():
     return build("searchconsole", "v1", credentials=get_credentials())
@@ -391,9 +421,8 @@ def lm_dates():
 def ga4_sessions_revenue(days: int = 30, start_date: Optional[str] = None, end_date: Optional[str] = None):
     """Daily sessions + revenue. Powers Revenue & Sessions chart."""
     try:
-        client     = get_ga4_client()
         start, end = date_range(days, start_date, end_date)
-        resp = client.run_report(RunReportRequest(
+        resp = run_ga4_report(RunReportRequest(
             property=f"properties/{GA4_PROPERTY_ID}",
             date_ranges=[DateRange(start_date=start.isoformat(), end_date=end.isoformat())],
             dimensions=[Dimension(name="date")],
@@ -416,7 +445,6 @@ def ga4_sessions_revenue(days: int = 30, start_date: Optional[str] = None, end_d
 def ga4_kpis(days: int = 30, start_date: Optional[str] = None, end_date: Optional[str] = None):
     """Rolling N-day KPIs vs prior N days. Powers the 4 KPI cards."""
     try:
-        client     = get_ga4_client()
         ctx        = period_context(days, start_date, end_date)
         start      = ctx["start"]
         end        = ctx["end"]
@@ -432,7 +460,7 @@ def ga4_kpis(days: int = 30, start_date: Optional[str] = None, end_date: Optiona
                     Metric(name="sessionConversionRate"), Metric(name="engagementRate"),
                 ],
             )
-            rows = client.run_report(req).rows
+            rows = run_ga4_report(req).rows
             if not rows:
                 return {
                     "sessions": 0,
@@ -480,9 +508,8 @@ def ga4_kpis(days: int = 30, start_date: Optional[str] = None, end_date: Optiona
 def ga4_traffic_sources(days: int = 30, start_date: Optional[str] = None, end_date: Optional[str] = None):
     """Session breakdown by channel group. Powers Traffic Sources donut."""
     try:
-        client     = get_ga4_client()
         start, end = date_range(days, start_date, end_date)
-        resp = client.run_report(RunReportRequest(
+        resp = run_ga4_report(RunReportRequest(
             property=f"properties/{GA4_PROPERTY_ID}",
             date_ranges=[DateRange(start_date=start.isoformat(), end_date=end.isoformat())],
             dimensions=[Dimension(name="sessionDefaultChannelGroup")],
@@ -508,11 +535,10 @@ def ga4_search_terms(days: int = 30, start_date: Optional[str] = None, end_date:
     in uppercase without merging meaningful suffixes such as DP128/9.
     """
     try:
-        client = get_ga4_client()
         ctx = period_context(days, start_date, end_date)
         limit = max(10, min(int(limit), 100))
 
-        resp = client.run_report(RunReportRequest(
+        resp = run_ga4_report(RunReportRequest(
             property=f"properties/{GA4_PROPERTY_ID}",
             date_ranges=[DateRange(start_date=ctx["start_date"], end_date=ctx["end_date"])],
             dimensions=[Dimension(name="searchTerm")],
@@ -1301,5 +1327,9 @@ def health():
             "gsc": bool(GSC_SITE_URL),
             "magento": bool(os.getenv("MYSQL_HOST")),
             "openai": bool(os.getenv("OPENAI_API_KEY")),
+        },
+        "credential_files": {
+            "ga4_service_account": bool(ga4_service_account_path and ga4_service_account_path.exists()),
+            "oauth_token": OAUTH_TOKEN.exists(),
         },
     }
