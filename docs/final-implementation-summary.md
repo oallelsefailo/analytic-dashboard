@@ -2,46 +2,172 @@
 
 Date: 2026-05-08
 
-## What Changed
+## What Changed In The Final Trust Cycle
 
-Implemented the final trust, polish, UX consistency, AI reliability, and executive-readiness improvements from `docs/final-audit-review.md` while preserving the existing single-page frontend and FastAPI backend.
+The prior implementation cycle completed the major trust, polish, UX consistency, AI reliability, and executive-readiness improvements from `docs/final-audit-review.md` while preserving the existing single-page frontend and FastAPI backend.
 
-## Agents Implemented
+Implemented improvements included:
 
-- Agent A - Frontend Trust State Fixer: request IDs, abort-controller cancellation, request timeouts, stale-response prevention, KPI/timestamp resets, partial source chips, and unavailable vs empty states.
-- Agent B - KPI Semantics Fixer: GA4 Ecommerce Revenue, Magento order-line revenue labels, percentage-point deltas for rate KPIs, sampled low-CTR wording, category-overlap caveats, and search-term session wording.
-- Agent C - AI Reliability Fixer: source coverage rows, partial-data visibility, deterministic fallback summaries/opportunities, safer review-target wording, filtered-item metadata, and stronger numeric grounding.
-- Agent D - UI Polish Fixer: chart empty overlays, long-value truncation/tooltips, reduced global loading, responsive signal strip behavior, neutral status wording, and spacing/overflow cleanup.
-- Agent E - Backend Hardening Fixer: narrowed static serving, configurable CORS, OAuth refresh logging/reduced writes, lightweight metadata, health cleanup, and dormant-top-sellers deprecation metadata.
-- Agent F - QA Regression Agent: static checks were run where possible; full browser/source-failure QA remains dependent on a running credentialed local environment.
+- request IDs, abort-controller cancellation, request timeouts, and stale-response prevention;
+- partial source chips for GA4, Search Console, and Magento;
+- clearer unavailable vs empty states;
+- chart empty overlays;
+- selected-period and comparison-period context;
+- GA4 Ecommerce Revenue and Magento order-line revenue wording;
+- percentage-point deltas for rate KPIs;
+- sampled low-CTR wording;
+- category-overlap caveats;
+- search-term session wording;
+- AI source coverage rows, filtered-item metadata, deterministic fallback summaries/opportunities, and stronger numeric grounding;
+- narrower static serving, configurable CORS, reduced OAuth token writes, health cleanup, and dormant-top-seller deprecation metadata.
 
-## Trust And Polish Issues Fixed
+## Final UX Review Outcome
 
-- Older date-range responses can no longer overwrite newer selected ranges.
-- Dashboard/search/opportunities/AI requests now have timeout behavior and can be retried cleanly.
-- Source chips now reflect partial states when one sub-endpoint fails while others succeed.
-- Stale search KPIs and AI timestamps are cleared before failed reloads.
-- Empty data is visually different from unavailable source data.
-- Chart panels no longer look blank when a dataset is empty or unavailable.
-- KPI labels now better match the actual data source and calculation.
-- AI output now shows source coverage, partial-data status, filtered-output metadata, and deterministic fallback content when OpenAI fails.
-- Opportunity wording is framed as review targets based on visible signal strength, not estimated impact scoring.
-- Backend static/CORS/OAuth/health behavior is safer for internal rollout.
+The follow-up product/experience audit found that the dashboard is now a strong internal beta and near executive-rollout candidate. It feels cohesive, operationally useful, and materially more trustworthy than the earlier review state.
 
-## Remaining Future / Nice-To-Have
+The dashboard now succeeds at:
 
-- Split `index.html` and `app/main.py` once the project grows beyond the current compact internal-tool scope.
-- Add a dedicated source readiness endpoint if internal deployment needs active health checks.
-- Add richer deterministic opportunity scoring only if the business wants explicitly scored review queues.
-- Continue moving repeated inline styles into CSS classes over time.
+- giving leadership a fast pulse on site performance;
+- reducing manual cross-system review for the web operations owner;
+- keeping AI constrained and non-chatbot-like;
+- communicating selected-period context and source confidence;
+- surfacing useful SEO, merchandising, search, and AI-assisted signals.
 
-## Remaining Risk Areas
+The remaining work is not a backend rewrite or a new integration pass. The highest-value next cycle is a final UX/product refinement pass focused on prioritization, executive phrasing, evidence-forward AI, mobile/tablet confidence, and smoother workflow cohesion.
 
-- Full QA requires live credentials and reachable GA4, GSC, Magento, and OpenAI services.
-- Magento order-line revenue can still differ from accounting/finance revenue due to discounts, refunds, tax, fulfillment, and category overlap.
-- Search-term sessions are summed across grouped GA4 search-term rows and should not be treated as unique searching visitors.
-- AI remains constrained and validated, but recommendations should still be reviewed by the web operations owner before action.
+## Remaining Product Risks
 
-## Executive-Readiness Assessment
+- The overview still reports metrics more than it interprets what deserves attention.
+- AI Summary and Opportunities are useful but too isolated from the first screen.
+- Some labels remain too technical or broad for executives: `AI Summary Panel`, `Opportunities`, `Low-CTR Pages`, raw source coverage names, and `Current`.
+- `Session Conversion Rate` may be read as ecommerce order conversion even though GA4 conversion depends on configured events.
+- Engagement copy should be session-based, not visitor-based.
+- Search Intelligence lists terms but does not yet identify which terms deserve review.
+- Product drop-off empty states are too quiet when no products qualify.
+- Traffic Sources is polished but low-action without comparison context.
+- Mobile/tablet behavior and Chart.js failure handling still need explicit QA.
 
-After this cycle, the dashboard is materially closer to executive-presentable. It now communicates source confidence, selected-period context, metric semantics, partial failures, and AI grounding more honestly. The product still feels focused and operational rather than overbuilt, and the remaining risks are mostly deployment QA and future maintainability rather than core trust blockers.
+## Safe To Continue
+
+Yes. The current platform direction is stable and aligned with the product philosophy:
+
+- internal executive operational intelligence;
+- lightweight GA4-style overview;
+- AI-assisted, not AI-driven;
+- one-person web operations workflow;
+- no new APIs, databases, packages, services, tracking systems, or enterprise BI complexity.
+
+## Next Recommended Implementation Team
+
+### Suggested Next Implementation Goals
+
+1. Make the overview answer `what deserves attention next?`
+2. Tighten executive-facing language and remove remaining technical/product-internal labels.
+3. Make AI and opportunity output more evidence-forward and less diagnostic-looking.
+4. Make Search Intelligence more actionable using only existing GA4 search-term data.
+5. Improve sparse-data, no-result, and chart-dependency confidence states.
+6. Polish mobile/tablet navigation, date controls, and layout density.
+7. Preserve active page state or explicitly support an overview-first refresh model.
+
+### Suggested Implementation Order
+
+1. Executive wording and trust copy
+   - Rename `AI Summary Panel` to `Executive Brief`.
+   - Rename `Opportunities` to `Review Targets`.
+   - Rename `Low-CTR Pages` to `Sampled Low-CTR Pages` or `Low-CTR Top Pages`.
+   - Rename `Session Conversion Rate` to `GA4 Conversion Rate` or `Configured Conversion Rate`.
+   - Update engagement tooltip copy to refer to sessions.
+   - Replace `Current` with selected-period-ready language.
+
+2. Overview prioritization
+   - Add a compact `What Needs Attention` strip or queue using existing signals only.
+   - Include low-CTR top pages, product drop-offs, category movement, and AI review target counts.
+   - Keep the queue capped to 3 to 5 items.
+
+3. AI and opportunity polish
+   - Use business-friendly source labels.
+   - Hide zero-value filtering metadata.
+   - Replace `Deterministic fallback` with clearer human wording.
+   - Change priority wording to signal-strength wording.
+   - Reduce short-range pressure to return many AI items.
+   - Add source/evidence rows directly inside opportunity cards.
+
+4. Search Intelligence actionability
+   - Flag high-volume terms, SKU-like terms, repeated terms, and blank-term volume.
+   - Add simple review tags without creating new integrations.
+   - Demote diagnostic blank-session data from headline prominence if a better existing-data KPI is available.
+
+5. Empty-state and confidence polish
+   - Split chart messages into true empty vs unavailable where source state is known.
+   - Add a product drop-off no-result confidence state that explains the threshold checked.
+   - Add graceful handling if Chart.js fails to load.
+
+6. Navigation and responsiveness
+   - Preserve active page with hash/local state or document overview-first refresh behavior.
+   - Improve mobile/tablet date picker behavior.
+   - Replace browser alerts with inline custom-range validation.
+   - Run the viewport QA matrix before final rollout.
+
+### Required Implementation Agents
+
+- Agent A: Executive Language and KPI Semantics Fixer
+  - Owns final label changes, metric wording, tooltips, status badge wording, browser title, and sampled-data clarity.
+
+- Agent B: Overview Prioritization Designer
+  - Owns the `What Needs Attention` queue, review target count cue, overview signal hierarchy, and drill paths from overview signals into detail pages.
+
+- Agent C: AI Experience Polish Fixer
+  - Owns AI/Review Target naming, source coverage labels, fallback wording, priority-to-signal language, evidence rows, and short-range output restraint.
+
+- Agent D: Search Intelligence Workflow Fixer
+  - Owns search-term review tags, high-volume/SKU-like/repeated-term flags, blank-session presentation, and search-specific empty states.
+
+- Agent E: UX Responsiveness and Interaction Fixer
+  - Owns hash/local page state, date picker validation, mobile/tablet layout, icon consistency, and scoped loading polish.
+
+- Agent F: QA / Experience Regression Agent
+  - Owns viewport testing, rapid date switching, empty/partial/unavailable states, AI unavailable states, Chart.js failure simulation, and browser console checks.
+
+### Suggested Responsibilities For Each Agent
+
+- Agent A should work first because language changes reduce ambiguity across the rest of the UI.
+- Agent B should keep the overview queue small and sourced only from already-loaded data.
+- Agent C should avoid making AI more prominent than the dashboard; the goal is quiet confidence.
+- Agent D should make Search Intelligence answer `which terms are worth checking?` without adding new sources.
+- Agent E should focus on polish that changes feel, not architecture.
+- Agent F should validate behavior across pages, date ranges, source states, and viewport sizes before handoff.
+
+### Areas Requiring Highest Attention
+
+- Executive wording and metric interpretation.
+- Overview actionability.
+- AI/source coverage readability.
+- Sparse-data confidence states.
+- Mobile/tablet layout and date controls.
+- Chart.js dependency failure behavior.
+- Short-range AI and product-drop-off noise.
+
+### Areas Safe To Defer
+
+- Saved report history.
+- User preferences and personalization.
+- New integrations or APIs.
+- Custom scoring models.
+- Full enterprise BI workflows.
+- Large refactors of `index.html` or `app/main.py`.
+- Deep accounting reconciliation between GA4 and Magento revenue.
+
+### Estimated Complexity / Risk Areas
+
+- Low complexity: label changes, tooltips, browser title, source label mapping, fallback wording.
+- Medium complexity: overview attention queue, opportunity evidence rows, Search Intelligence tags, inline date validation, no-result confidence states.
+- Medium-high complexity: mobile/tablet polish if visual regressions appear across breakpoints.
+- Medium-high risk: Chart.js failure fallback because chart construction is spread across multiple builders.
+- Low strategic risk: all recommended changes fit the existing architecture and current data sources.
+
+### Suggested Next Codex Implementation Prompt
+
+Use this prompt for the next coding team:
+
+> Implement a final UX/product polish pass for the Mockett Analytics Dashboard. Do not add APIs, services, packages, databases, tracking systems, or new integrations. Focus only on the existing single-page frontend and current FastAPI responses. Goals: rename executive-facing labels (`Executive Brief`, `Review Targets`, sampled low-CTR wording, GA4/configured conversion wording, selected-period status wording), add a small Overview `What Needs Attention` queue from existing loaded signals, make AI/source coverage labels human-readable, add evidence rows to review target cards, reduce short-range AI output pressure, make Search Intelligence highlight high-volume/SKU-like/repeated terms, improve product-drop-off no-result confidence states, replace custom-range browser alerts with inline validation, preserve active page state or document overview-first refresh behavior, and add graceful handling if Chart.js is unavailable. Keep the dashboard AI-assisted, not AI-driven, and keep all recommendations realistic for a one-person web operations team.
+

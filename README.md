@@ -1,101 +1,77 @@
 # Mockett Analytics Dashboard
 
-Internal operational intelligence dashboard for monitoring and analyzing performance across mockett.com.
+The Mockett Analytics Dashboard is an internal operational intelligence platform for mockett.com. It gives leadership and the web operations owner a concise view of website performance, search visibility, merchandising movement, and AI-assisted review targets without requiring daily jumps between GA4, Google Search Console, Magento, and manual notes.
 
-This platform consolidates website analytics, SEO performance, Magento sales data, merchandising signals, and AI-assisted opportunity analysis into a single executive-facing interface.
+This is not a public open-source package, a GA4 replacement, or a chatbot. It is a focused internal dashboard built to answer one practical question quickly: how is the site doing, and what deserves attention next?
 
-The project is designed to reduce manual analysis work while surfacing meaningful business trends and operational opportunities across the Mockett web ecosystem.
+## Product Philosophy
 
----
+- Executive-facing, but practical enough for daily web operations.
+- Lightweight GA4-style overview portal, not enterprise BI.
+- AI-assisted, not AI-driven.
+- Clear source confidence, selected-period context, and metric semantics matter more than feature breadth.
+- Recommendations should stay narrow, realistic, and review-oriented for a one-person web operations workflow.
 
-# Purpose
+## Current Dashboard Experience
 
-Mockett’s web ecosystem spans multiple disconnected systems:
+The platform currently provides:
 
-- Magento 2
-- Google Analytics 4
-- Google Search Console
-- merchandising data
-- category/product performance
-- search behavior
+- Executive overview with GA4 revenue, sessions, conversion, engagement, Search Console signals, and Magento merchandising signals.
+- Selected-period and prior-period comparison context.
+- Source status indicators for GA4, Search Console, and Magento.
+- Revenue/session trends, traffic source breakdowns, SEO review candidates, category trends, product revenue, and product drop-off watchlists.
+- Search Intelligence based on usable GA4 on-site search-term rows.
+- AI Executive Brief and focused Opportunities pages.
+- Empty, unavailable, partial-data, timeout, and deterministic fallback states.
+- Date presets and custom date ranges that avoid incomplete current-day analytics.
 
-Reviewing these systems individually is time-consuming and makes it difficult to quickly identify larger trends or operational gaps.
+## AI Philosophy
 
-This dashboard exists to centralize those signals into a single internal platform.
+The AI layer is intentionally constrained. It summarizes available signals, highlights narrow review targets, and reduces manual analysis time. It should never feel like the primary product, make autonomous changes, invent causes, generate broad SKU cleanup work, or create a large task queue.
 
----
+AI output is expected to:
 
-# Current Capabilities
+- cite specific numbers from available data;
+- stay within current dashboard sources;
+- disclose source coverage and partial-data states;
+- recommend focused reviews that can realistically be handled by one operator;
+- remain useful when OpenAI is unavailable through deterministic fallback content.
 
-The dashboard currently includes:
+## Data Sources
 
-- Executive KPI overview
-- Revenue and traffic trend analysis
-- Traffic source breakdowns
-- Search Console performance monitoring
-- SEO opportunity detection
-- Magento category revenue analysis
-- Product performance tracking
-- Dormant top-seller detection
-- AI-assisted executive summaries
-- AI-assisted opportunity surfacing
-
----
-
-# AI Philosophy
-
-The AI layer is intentionally constrained.
-
-The system is designed to:
-
-- identify anomalies
-- summarize trends
-- surface operational opportunities
-- reduce manual analysis time
-
-The system is NOT designed to:
-
-- autonomously modify Magento
-- generate massive SKU cleanup tasks
-- make architectural decisions
-- replace human review
-
-AI recommendations are intentionally limited to realistic, scalable review actions appropriate for a small internal web operations team.
-
----
-
-# Data Sources
-
-Current integrations include:
+The current dashboard uses the existing project sources only:
 
 - Google Analytics 4
 - Google Search Console
 - Magento 2
-- OpenAI API
+- OpenAI API for constrained summaries and review-target selection
 
-Future integrations may include:
+No new APIs, databases, tracking systems, or external services should be added without explicit approval.
 
-- internal search intelligence
-- merchandising opportunity tracking
+## Current Maturity
 
----
+As of May 8, 2026, the dashboard is a strong internal beta and near executive-rollout candidate. It now feels cohesive, polished, and operationally useful, with meaningful trust improvements around source state, date coverage, metric labels, partial failures, loading behavior, and AI fallback handling.
 
-# Long-Term Vision
+The remaining work is final product polish rather than architectural redesign. The highest-value next pass should focus on sharper prioritization, more executive wording, more actionable Search Intelligence, mobile/tablet QA, and calmer behavior in sparse or unavailable data states.
 
-The long-term goal is to evolve the platform into a centralized operational intelligence layer for Mockett’s digital ecosystem.
+## Intended Use
 
-Future planned areas include:
+Use this dashboard for quick operating reviews:
 
-- search intelligence
-- merchandising insights
-- anomaly detection
-- executive reporting
-- opportunity forecasting
-- category-level performance analysis
-- AI-assisted operational recommendations
+- leadership pulse checks;
+- weekly web performance review;
+- Search Console and SEO opportunity triage;
+- Magento category and product movement review;
+- identifying a small number of realistic next actions.
 
----
+Do not treat it as accounting truth, a full analytics warehouse, an autonomous site manager, or a replacement for deeper source-system investigation when a number needs to be reconciled.
 
-# Internal Use Only
+## Project Shape
 
-This repository is intended for internal development and operational use.
+- `index.html` contains the single-page dashboard UI, charts, navigation, date controls, loading states, trust states, and AI/opportunity rendering.
+- `app/main.py` contains the FastAPI backend for GA4, Search Console, Magento, AI summary, opportunities, and health endpoints.
+- `docs/` contains review history, current state, audit findings, and implementation handoff notes.
+
+## Internal Use Only
+
+This repository is intended for internal Mockett development and operational use.
