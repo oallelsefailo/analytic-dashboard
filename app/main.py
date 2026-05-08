@@ -232,6 +232,11 @@ ALLOWED_AI_ACTIONS = {
     "review_category_navigation",
 }
 
+PRODUCT_DROPOFF_MIN_REVENUE_DROP = 250
+PRODUCT_DROPOFF_MIN_DELTA = -35
+PRODUCT_DROPOFF_CANDIDATE_LIMIT = 50
+PRODUCT_DROPOFF_RETURN_LIMIT = 10
+
 ACTION_LABELS = {
     "review_search_snippet_alignment": "Review search snippet",
     "review_low_ctr_page_copy": "Review page copy",
@@ -899,7 +904,7 @@ def magento_product_dropoffs(days: int = 30, start_date: Optional[str] = None, e
                     GROUP BY soi.product_id, soi.name, soi.sku
                     HAVING revenue_previous > 0
                     ORDER BY revenue_previous DESC
-                    LIMIT 50
+                    LIMIT %s
                 ) prev
                 LEFT JOIN (
                     SELECT soi.product_id, SUM(soi.row_total) AS revenue_current
@@ -910,7 +915,7 @@ def magento_product_dropoffs(days: int = 30, start_date: Optional[str] = None, e
                     WHERE soi.parent_item_id IS NULL
                     GROUP BY soi.product_id
                 ) curr ON curr.product_id = prev.product_id
-                """, (prev_start.isoformat(), prev_end_excl, start.isoformat(), end_excl))
+                """, (prev_start.isoformat(), prev_end_excl, PRODUCT_DROPOFF_CANDIDATE_LIMIT, start.isoformat(), end_excl))
                 rows = cur.fetchall()
         finally:
             conn.close()
@@ -923,7 +928,7 @@ def magento_product_dropoffs(days: int = 30, start_date: Optional[str] = None, e
                 continue
             delta = pct_delta(curr, prev)
             drop = prev - curr
-            if curr == 0 or (delta is not None and delta <= -35 and drop >= 250):
+            if drop >= PRODUCT_DROPOFF_MIN_REVENUE_DROP and (curr == 0 or (delta is not None and delta <= PRODUCT_DROPOFF_MIN_DELTA)):
                 products.append({
                     "name": row["name"],
                     "sku": row["sku"],
@@ -941,7 +946,20 @@ def magento_product_dropoffs(days: int = 30, start_date: Optional[str] = None, e
                 "end_date": ctx["end_date"],
                 "comparison": ctx["comparison"],
             },
-            "products": products[:10],
+            "criteria": {
+                "candidate_pool": f"Top {PRODUCT_DROPOFF_CANDIDATE_LIMIT} products by prior-period Magento order-line revenue",
+                "candidate_limit": PRODUCT_DROPOFF_CANDIDATE_LIMIT,
+                "minimum_revenue_drop": PRODUCT_DROPOFF_MIN_REVENUE_DROP,
+                "minimum_delta_percent": PRODUCT_DROPOFF_MIN_DELTA,
+                "return_limit": PRODUCT_DROPOFF_RETURN_LIMIT,
+                "rule": "Current-period revenue is zero, or revenue fell at least 35%, and the dollar drop is at least $250.",
+            },
+            "counts": {
+                "candidates_evaluated": len(rows),
+                "qualified": len(products),
+                "returned": min(len(products), PRODUCT_DROPOFF_RETURN_LIMIT),
+            },
+            "products": products[:PRODUCT_DROPOFF_RETURN_LIMIT],
         }
 
     except Exception as e:

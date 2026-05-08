@@ -1941,11 +1941,13 @@ async function loadDashboard() {
     if (el) {
       el.querySelector('.kpi-value').textContent = count;
       el.querySelector('.kpi-delta').className = count > 0 ? 'kpi-delta dn' : 'kpi-delta neu';
-      el.querySelector('.kpi-delta').textContent = count > 0 ? `Declined ${comparisonText()}` : `No major declines ${comparisonText()}`;
+      const limitText = d.criteria && d.criteria.return_limit ? `Up to ${d.criteria.return_limit} matching products` : 'Matching products';
+      el.querySelector('.kpi-delta').textContent = count > 0 ? `${limitText} ${comparisonText()}` : `No major declines ${comparisonText()}`;
     }
     if (count > 0 && panel && list) {
       panel.style.display = 'block';
-      list.innerHTML = products.map(p => {
+      const criteriaNote = d.criteria ? `<div class="empty-state" style="margin-bottom:10px;">Showing up to ${escapeHTML(String(d.criteria.return_limit || 10))} products from the prior-period top ${escapeHTML(String(d.criteria.candidate_limit || 50))} candidate pool. Each item dropped at least $${Number(d.criteria.minimum_revenue_drop || 250).toLocaleString()} and either reached zero current-period revenue or fell at least ${Math.abs(Number(d.criteria.minimum_delta_percent || -35))}%. Longer ranges may show fewer products because fewer items meet the decline threshold.</div>` : '';
+      list.innerHTML = criteriaNote + products.map(p => {
         const prev = fmtDropoffRevenue(p.previous_revenue);
         const curr = fmtDropoffRevenue(p.current_revenue);
         const delta = p.delta === null || p.delta === undefined ? '-' : p.delta + '%';
