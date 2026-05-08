@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="https://www.mockett.com/static/version1776862565/frontend/WSM/Base/en_US/Magento_Theme/favicon-16x16.png">
-<title>Mockett AI — Executive Insights Dashboard</title>
+<title>Mockett Analytics Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -88,6 +88,14 @@
   }
   .drp-option:hover  { background: var(--surface2); color: var(--text); }
   .drp-option.active { color: var(--accent2); font-weight: 500; }
+  .drp-error {
+    display: none;
+    margin-top: 8px;
+    font-size: 11.5px;
+    color: var(--red);
+    line-height: 1.45;
+  }
+  .drp-error.show { display: block; }
 
   /* ─── THEME TOGGLE ─── */
   .theme-btn {
@@ -608,6 +616,17 @@
   .signal-label { font-size:10.5px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px; }
   .signal-value { font-size:13px; color:var(--text); font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .signal-note { font-size:11.5px; color:var(--text3); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .attention-panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; }
+  .attention-header { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .attention-title { font-size:13.5px; font-weight:600; color:var(--text); }
+  .attention-sub { font-size:11.5px; color:var(--text3); }
+  .attention-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0; }
+  .attention-item { min-width:0; padding:14px 16px; border-right:1px solid var(--border); }
+  .attention-item:last-child { border-right:none; }
+  .attention-kicker { font-size:10.5px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
+  .attention-main { font-size:13px; color:var(--text); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .attention-note { font-size:12px; color:var(--text3); margin-top:4px; line-height:1.45; }
+  .attention-link { margin-top:8px; border:0; background:transparent; color:var(--accent2); padding:0; font:inherit; font-size:12px; cursor:pointer; }
   .chart-empty-overlay { position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:18px; color:var(--text3); font-size:12.5px; line-height:1.5; background:rgba(19,23,32,0.82); pointer-events:none; }
   body.light .chart-empty-overlay { background:rgba(255,255,255,0.82); }
   .chart-empty-overlay.show { display:flex; }
@@ -617,6 +636,21 @@
   .meta-pill.available { border-color:rgba(34,199,125,0.25); color:var(--green); }
   .meta-pill.partial { border-color:rgba(245,158,11,0.25); color:var(--amber); }
   .meta-pill.unavailable { border-color:rgba(255,79,106,0.25); color:var(--red); }
+  .review-tags { display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; min-width:130px; }
+  .review-tag { border:1px solid var(--border); border-radius:999px; padding:2px 7px; font-size:10.5px; color:var(--text3); background:var(--surface2); white-space:nowrap; }
+  .review-tag.strong { border-color:rgba(61,127,255,0.25); color:var(--accent2); }
+  .review-tag.warn { border-color:rgba(245,158,11,0.25); color:var(--amber); }
+  .review-tag.sku { border-color:rgba(15,212,184,0.25); color:var(--teal); }
+  .opp-evidence { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .evidence-pill { border:1px solid var(--border); border-radius:6px; padding:3px 8px; font-size:11px; color:var(--text3); background:rgba(255,255,255,0.02); }
+  .evidence-pill strong { color:var(--text2); font-weight:600; }
+
+  @media (max-width: 900px) {
+    .attention-list { grid-template-columns:1fr; }
+    .attention-item { border-right:none; border-bottom:1px solid var(--border); }
+    .attention-item:last-child { border-bottom:none; }
+    .review-tags { justify-content:flex-start; min-width:0; width:100%; }
+  }
 </style>
 </head>
 <body>
@@ -629,7 +663,7 @@
         <div class="logo-mark">M</div>
         <div>
           <div class="logo-text">Mockett.com</div>
-          <div class="logo-sub">AI Insights</div>
+          <div class="logo-sub">Analytics</div>
         </div>
       </div>
     </div>
@@ -673,19 +707,19 @@
     </div>
 
     <div class="nav-section">
-      <div class="nav-label">AI Layer</div>
+      <div class="nav-label">Assisted Review</div>
       <div class="nav-item" onclick="nav('ai', this)">
         <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
           <path d="M8 1.5l1.5 4L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
         </svg>
-        AI Summary Panel
+        Executive Brief
       </div>
       <div class="nav-item" onclick="nav('opps', this)">
         <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
           <path d="M8 2v3M8 11v3M2 8h3M11 8h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.3"/>
         </svg>
-        Opportunities
+        Review Targets
       </div>
     </div>
 
@@ -741,6 +775,7 @@
               <input type="date" id="drp-end" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);width:130px;">
               <button onclick="applyCustomRange()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:var(--font);">Apply</button>
             </div>
+            <div class="drp-error" id="drp-error"></div>
           </div>
         </div>
 
@@ -773,6 +808,22 @@
         <div class="signal-item"><div class="signal-label">Search Signal</div><div class="signal-value">Waiting for Search Console</div><div class="signal-note">Top-page CTR sample</div></div>
         <div class="signal-item"><div class="signal-label">Merchandising Signal</div><div class="signal-value">Waiting for Magento</div><div class="signal-note">Order-line revenue sample</div></div>
       </div>
+      <div class="attention-panel" id="attention-panel">
+        <div class="attention-header">
+          <div>
+            <div class="attention-title">What Needs Attention</div>
+            <div class="attention-sub">A small review queue from already-loaded dashboard signals.</div>
+          </div>
+          <span class="panel-tag teal" id="attention-count">Checking</span>
+        </div>
+        <div class="attention-list" id="attention-list">
+          <div class="attention-item">
+            <div class="attention-kicker">Loading</div>
+            <div class="attention-main">Waiting for selected-period signals</div>
+            <div class="attention-note">Review targets will appear after GA4, Search Console, and Magento respond.</div>
+          </div>
+        </div>
+      </div>
 
       <!-- KPIs -->
       <div class="kpi-grid">
@@ -792,17 +843,17 @@
           <div class="kpi-value">—</div>
           <div class="kpi-delta neu">Loading GA4</div>
         </div>
-        <div class="kpi-card red" id="kpi-conversion" title="GA4 sessionConversionRate for the selected period, shown as a percentage. This follows the conversion events configured in GA4.">
+        <div class="kpi-card red" id="kpi-conversion" title="GA4 sessionConversionRate for the selected period, shown as a percentage. This follows the conversion events configured in GA4 and is not necessarily ecommerce order conversion.">
           <div class="kpi-header">
-            <div class="kpi-label">Session Conversion Rate</div>
+            <div class="kpi-label">GA4 Conversion Rate</div>
             <div class="kpi-icon red">🎯</div>
           </div>
           <div class="kpi-value">—</div>
           <div class="kpi-delta neu">Loading GA4</div>
         </div>
-        <div class="kpi-card purple" id="kpi-engagement" title="Percentage of visitors who actively engaged with the site — scrolled, clicked, or spent 10+ seconds on a page. Higher means visitors found what they were looking for.">
+        <div class="kpi-card purple" id="kpi-engagement" title="Percentage of sessions that actively engaged with the site: scrolled, clicked, or spent 10+ seconds on a page. Higher means sessions showed useful engagement.">
           <div class="kpi-header">
-            <div class="kpi-label">Visitor Engagement Rate</div>
+            <div class="kpi-label">Engaged Session Rate</div>
             <div class="kpi-icon purple">🔍</div>
           </div>
           <div class="kpi-value">—</div>
@@ -938,7 +989,7 @@
           <div class="kpi-delta neu">Loading Search Console</div>
         </div>
         <div class="kpi-card purple" id="kpi-low-ctr" title="Fetched top Search Console pages with more than 5,000 impressions and less than 2% CTR. This is a sampled review queue, not a sitewide total.">
-          <div class="kpi-header"><div class="kpi-label">Low-CTR Pages</div><div class="kpi-icon purple">⚠</div></div>
+          <div class="kpi-header"><div class="kpi-label">Sampled Low-CTR Pages</div><div class="kpi-icon purple">⚠</div></div>
           <div class="kpi-value">—</div>
           <div class="kpi-delta neu">Loading Search Console</div>
         </div>
@@ -1034,12 +1085,12 @@
     </div>
 
     <!-- ══════════════════════════════════════
-         PAGE: AI SUMMARY PANEL
+         PAGE: EXECUTIVE BRIEF
     ══════════════════════════════════════ -->
     <div id="page-ai" class="content page">
       <div class="ai-panel">
         <div class="ai-header">
-          <div class="ai-badge">AI Summary</div>
+          <div class="ai-badge">Executive Brief</div>
           <div class="ai-title">Executive Brief</div>
           <div class="ai-time" id="ai-generated-time">Loading...</div>
           <button onclick="printAiSummary()" id="ai-print-btn" style="margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 12px;font-size:12px;color:var(--text2);cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:6px;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
@@ -1055,13 +1106,13 @@
     </div>
 
     <!-- ══════════════════════════════════════
-         PAGE: OPPORTUNITIES
+         PAGE: REVIEW TARGETS
     ══════════════════════════════════════ -->
     <div id="page-opps" class="content page">
       <div class="panel">
         <div class="panel-header">
-          <div class="panel-title"><div class="dot amber"></div>Focused Opportunities</div>
-          <span class="panel-tag teal">AI Review</span>
+          <div class="panel-title"><div class="dot amber"></div>Review Targets</div>
+          <span class="panel-tag teal">Assisted Review</span>
         </div>
         <div class="panel-meta-row" id="opp-source-coverage">Source coverage will appear after opportunity generation.</div>
         <div class="panel-body">
@@ -1095,6 +1146,7 @@ function toggleTheme() {
 
 function rebuildChartsOnly() {
   // Redraw existing charts with current theme colors — no API calls
+  if (!window.Chart) return;
   [revChartInst, donutChartInst, catChartInst, seoChartInst, merchChartInst].forEach(chart => {
     if (!chart) return;
     applyChartTheme(chart);
@@ -1118,7 +1170,17 @@ const REQUEST_TIMEOUTS = { dashboard: 30000, search: 20000, ai: 60000, opportuni
 const requestState = { dashboard: null, search: null, ai: null, opportunities: null };
 let requestSeq = 0;
 let dashboardHasLoaded = false;
-let latestExecutiveSignals = { revenue: null, revenueDelta: null, lowCtrCount: null, topCategory: null, dropoffCount: null };
+let latestExecutiveSignals = {
+  revenue: null,
+  revenueDelta: null,
+  lowCtrCount: null,
+  lowCtrPages: [],
+  topCategory: null,
+  decliningCategories: [],
+  dropoffCount: null,
+  dropoffProducts: [],
+  reviewTargetCount: null
+};
 
 function beginRequest(scope) {
   if (requestState[scope] && requestState[scope].controller) requestState[scope].controller.abort();
@@ -1198,6 +1260,18 @@ function unavailableState(message) {
   return `<div class="empty-state unavailable-state">${escapeHTML(message)}</div>`;
 }
 
+function showDateRangeError(message) {
+  const el = document.getElementById('drp-error');
+  if (!el) return;
+  if (message) {
+    el.textContent = message;
+    el.classList.add('show');
+  } else {
+    el.textContent = '';
+    el.classList.remove('show');
+  }
+}
+
 function setTextWithTitle(element, value) {
   if (!element) return;
   const text = String(value ?? '');
@@ -1216,6 +1290,16 @@ function setChartOverlay(canvasId, message) {
     overlay.textContent = '';
     overlay.classList.remove('show');
   }
+}
+
+function chartUnavailable(canvasId) {
+  if (window.Chart) return false;
+  setChartOverlay(canvasId, 'Chart rendering is unavailable because Chart.js did not load. The selected-period numbers and tables are still shown when available.');
+  return true;
+}
+
+function destroyChart(chart) {
+  if (chart && typeof chart.destroy === 'function') chart.destroy();
 }
 
 function setSourceStatus(source, status, label) {
@@ -1241,7 +1325,7 @@ function updateLiveBadge() {
   const unavailable = chips.filter(chip => chip.classList.contains('unavailable')).length;
   const partial = chips.filter(chip => chip.classList.contains('partial')).length;
   const pending = chips.filter(chip => chip.classList.contains('pending')).length;
-  const status = unavailable === chips.length ? 'Unavailable' : unavailable || partial || pending ? 'Partial' : 'Current';
+  const status = unavailable === chips.length ? 'Unavailable' : unavailable || partial || pending ? 'Partial' : 'Selected Period Ready';
   badge.className = status === 'Unavailable' ? 'live-badge offline' : status === 'Partial' ? 'live-badge partial' : 'live-badge';
   badge.innerHTML = `<div class="live-dot"></div>${status}`;
 }
@@ -1252,7 +1336,9 @@ function resetSourceStatuses() {
   setSourceStatus('magento', 'pending', 'Magento 2 checking');
   const coverage = document.getElementById('period-coverage');
   if (coverage) coverage.textContent = 'Selected analytics period is loading.';
+  latestExecutiveSignals = { revenue: null, revenueDelta: null, lowCtrCount: null, lowCtrPages: [], topCategory: null, decliningCategories: [], dropoffCount: null, dropoffProducts: [], reviewTargetCount: null };
   updateExecutiveSignals({});
+  renderAttentionQueue();
   updateLiveBadge();
 }
 
@@ -1289,6 +1375,67 @@ function updateExecutiveSignals(next) {
     <div class="signal-item"><div class="signal-label">Revenue Signal</div><div class="signal-value" title="${escapeHTML(revenueText)}">${escapeHTML(revenueText)}</div><div class="signal-note" title="${escapeHTML(revenueNote)}">${escapeHTML(revenueNote)}</div></div>
     <div class="signal-item"><div class="signal-label">Search Signal</div><div class="signal-value" title="${escapeHTML(searchText)}">${escapeHTML(searchText)}</div><div class="signal-note">Sampled from fetched top Search Console pages</div></div>
     <div class="signal-item"><div class="signal-label">Merchandising Signal</div><div class="signal-value" title="${escapeHTML(merchText)}">${escapeHTML(merchText)}</div><div class="signal-note" title="${escapeHTML(dropNote)}">${escapeHTML(dropNote)}</div></div>`;
+  renderAttentionQueue();
+}
+
+function addAttentionItem(items, kicker, main, note, page) {
+  if (items.length >= 5) return;
+  items.push({ kicker, main, note, page });
+}
+
+function renderAttentionQueue() {
+  const list = document.getElementById('attention-list');
+  const count = document.getElementById('attention-count');
+  if (!list) return;
+  const items = [];
+  const lowCtrPages = latestExecutiveSignals.lowCtrPages || [];
+  const dropoffs = latestExecutiveSignals.dropoffProducts || [];
+  const decliningCategories = latestExecutiveSignals.decliningCategories || [];
+
+  if (lowCtrPages.length) {
+    const page = lowCtrPages[0];
+    const path = String(page.url || '/').replace('https://www.mockett.com','').replace('https://mockett.com','') || '/';
+    addAttentionItem(items, 'Search', path, `${Number(page.impressions || 0).toLocaleString()} impressions at ${Number(page.ctr || 0).toFixed(2)}% CTR. Review snippet and visible page copy.`, 'seo');
+  }
+
+  if (dropoffs.length) {
+    const product = dropoffs[0];
+    addAttentionItem(items, 'Merchandising', product.sku || 'Product drop-off', `${fmtDropoffRevenue(product.previous_revenue)} to ${fmtDropoffRevenue(product.current_revenue)} ${comparisonText()}. Check this item only.`, 'merch');
+  }
+
+  if (decliningCategories.length) {
+    const category = decliningCategories[0];
+    addAttentionItem(items, 'Category', category.name || 'Declining category', `${category.delta}% ${comparisonText()} on Magento order-line revenue. Review featured products or category links.`, 'merch');
+  }
+
+  if (latestExecutiveSignals.revenueDelta !== null && latestExecutiveSignals.revenueDelta !== undefined && latestExecutiveSignals.revenueDelta < -10) {
+    addAttentionItem(items, 'Revenue', 'GA4 revenue declined', `${Number(latestExecutiveSignals.revenueDelta).toFixed(1)}% ${comparisonText()}. Use the charts to confirm whether traffic or conversion moved with it.`, 'overview');
+  }
+
+  if (latestExecutiveSignals.reviewTargetCount) {
+    addAttentionItem(items, 'Review Targets', `${latestExecutiveSignals.reviewTargetCount} assisted targets available`, 'Open the focused review list for evidence-backed targets from the selected period.', 'opps');
+  }
+
+  if (!items.length) {
+    list.innerHTML = `<div class="attention-item">
+      <div class="attention-kicker">No clear queue yet</div>
+      <div class="attention-main">Selected-period signals look calm</div>
+      <div class="attention-note">No loaded signal currently crosses the review thresholds for search, merchandising, or revenue.</div>
+    </div>`;
+    if (count) count.textContent = '0 items';
+    return;
+  }
+
+  const shown = items.slice(0, 3);
+  list.innerHTML = shown.map(item => `
+    <div class="attention-item">
+      <div class="attention-kicker">${escapeHTML(item.kicker)}</div>
+      <div class="attention-main" title="${escapeHTML(item.main)}">${escapeHTML(item.main)}</div>
+      <div class="attention-note">${escapeHTML(item.note)}</div>
+      <button class="attention-link" onclick="nav('${escapeHTML(item.page)}')">Open ${escapeHTML(PAGES[item.page]?.title || 'page')}</button>
+    </div>
+  `).join('');
+  if (count) count.textContent = `${shown.length} item${shown.length === 1 ? '' : 's'}`;
 }
 
 function formatDisplayDate(value) {
@@ -1307,9 +1454,11 @@ function updatePeriodCoverage(period) {
 function toggleDatePicker() {
   const dd = document.getElementById('drp-dropdown');
   dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+  if (dd.style.display === 'block') showDateRangeError('');
 }
 
 function setDays(days, label) {
+  showDateRangeError('');
   DAYS = days;
   PERIOD_LABEL = label;
   CUSTOM_START = null;
@@ -1355,16 +1504,17 @@ function hideLoadingState() {
 function applyCustomRange() {
   const start = document.getElementById('drp-start').value;
   const end   = document.getElementById('drp-end').value;
-  if (!start || !end) { alert('Please select both a start and end date.'); return; }
-  if (start > end)    { alert('Start date must be before or equal to end date.'); return; }
+  showDateRangeError('');
+  if (!start || !end) { showDateRangeError('Select both a start and end date.'); return; }
+  if (start > end)    { showDateRangeError('Start date must be before or equal to end date.'); return; }
 
   const ms   = parseDateInput(end) - parseDateInput(start);
   const days = Math.round(ms / (1000 * 60 * 60 * 24)) + 1;
   const today = new Date();
   today.setHours(0,0,0,0);
-  if (parseDateInput(end) >= today) { alert('Custom ranges must end before today so analytics data is complete.'); return; }
+  if (parseDateInput(end) >= today) { showDateRangeError('Custom ranges must end before today so analytics data is complete.'); return; }
 
-  if (days > 500) { alert('Custom range cannot exceed 500 days.'); return; }
+  if (days > 500) { showDateRangeError('Custom range cannot exceed 500 days.'); return; }
 
   DAYS = days;
   PERIOD_LABEL = 'Custom Range';
@@ -1399,8 +1549,8 @@ const PAGES = {
   search:   { title: 'Search Intelligence',     sub: 'Selected-period on-site search terms from GA4' },
   seo:      { title: 'SEO Performance',         sub: 'Google Search Console + GA4 - impressions & CTR' },
   merch:    { title: 'Merchandising',           sub: 'Magento order-line revenue and product movement' },
-  ai:       { title: 'AI Summary Panel',        sub: 'Executive brief - constrained recommendations' },
-  opps:     { title: 'Opportunities',           sub: 'AI-filtered review targets - visible signal strength' }
+  ai:       { title: 'Executive Brief',         sub: 'Constrained summary from available dashboard signals' },
+  opps:     { title: 'Review Targets',          sub: 'Focused review targets with visible signal strength' }
 };
 
 // Track whether AI/opps have been loaded for the current DAYS value
@@ -1409,16 +1559,24 @@ let oppsLoadedForDays = null;
 let searchLoadedForRange = null;
 
 function nav(id, el) {
+  if (!PAGES[id] || !document.getElementById('page-' + id)) id = 'overview';
+  el = el || Array.from(document.querySelectorAll('.nav-item')).find(item => item.getAttribute('onclick') && item.getAttribute('onclick').includes(`'${id}'`));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  el.classList.add('active');
+  if (el) el.classList.add('active');
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
   document.getElementById('page-title').textContent = PAGES[id].title;
   document.getElementById('page-sub').textContent   = PAGES[id].sub;
+  if (location.hash !== '#' + id) history.replaceState(null, '', '#' + id);
 
   if (id === 'search' && searchLoadedForRange !== rangeKey()) loadSearchIntelligence();
   if (id === 'ai' && aiLoadedForDays !== rangeKey()) loadAiSummary();
   if (id === 'opps' && oppsLoadedForDays !== rangeKey()) loadOpportunities();
+}
+
+function restoreActivePage() {
+  const requested = (location.hash || '').replace('#', '');
+  if (requested && PAGES[requested]) nav(requested);
 }
 
 function renderSourceCoverage(data, targetId) {
@@ -1426,14 +1584,24 @@ function renderSourceCoverage(data, targetId) {
   if (!target) return;
   const period = data && data.period ? `${formatDisplayDate(data.period.start_date)} through ${formatDisplayDate(data.period.end_date)}` : currentPeriodLabel();
   const sources = data && data.sources ? Object.entries(data.sources) : [];
+  const SOURCE_LABELS = {
+    ga4: 'GA4 overview',
+    gsc: 'Search Console summary',
+    gsc_pages: 'Search Console top pages',
+    magento_categories: 'Magento categories',
+    magento_top_products: 'Magento top products',
+    magento_product_dropoffs: 'Magento product drop-offs'
+  };
+  const STATUS_LABELS = { available: 'available', partial: 'partial', unavailable: 'unavailable' };
   const pills = sources.length ? sources.map(([name, info]) => {
     const status = info.status === 'available' ? 'available' : info.status === 'partial' ? 'partial' : 'unavailable';
     const count = info.count !== undefined ? ` (${info.count})` : '';
-    return `<span class="meta-pill ${status}">${escapeHTML(name.replaceAll('_',' '))}: ${escapeHTML(info.status || 'unknown')}${count}</span>`;
+    return `<span class="meta-pill ${status}">${escapeHTML(SOURCE_LABELS[name] || name.replaceAll('_',' '))}: ${escapeHTML(STATUS_LABELS[status] || 'unknown')}${count}</span>`;
   }).join('') : '<span class="meta-pill unavailable">source coverage unavailable</span>';
-  const filtered = data && data.filtered_items ? ` Filtered ${data.filtered_items.removed || 0} weak or unsupported AI items.` : '';
+  const removed = data && data.filtered_items ? Number(data.filtered_items.removed || 0) : 0;
+  const filtered = removed > 0 ? ` ${removed} weak or unsupported item${removed === 1 ? '' : 's'} hidden.` : '';
   const partial = data && data.partial_data ? ' Limited source data.' : '';
-  const fallback = data && data.fallback ? ' Deterministic fallback.' : '';
+  const fallback = data && data.fallback ? ' Rule-based fallback because AI was unavailable or returned unusable output.' : '';
   target.innerHTML = `<strong>${escapeHTML(period)}</strong>${partial}${fallback}${filtered}<div style="margin-top:6px">${pills}</div>`;
 }
 
@@ -1473,8 +1641,9 @@ async function loadOpportunities() {
     renderOpportunities(res.data);
   } else {
     oppsLoadedForDays = null;
-    if (coverage) coverage.innerHTML = '<span class="meta-pill unavailable">Opportunities unavailable</span>';
-    if (oppList) oppList.innerHTML = unavailableState(res.error === 'timeout_or_aborted' ? 'Opportunity analysis timed out. Try again for this selected period.' : 'Opportunities are unavailable for this selected period.');
+    updateExecutiveSignals({ reviewTargetCount: null });
+    if (coverage) coverage.innerHTML = '<span class="meta-pill unavailable">Review targets unavailable</span>';
+    if (oppList) oppList.innerHTML = unavailableState(res.error === 'timeout_or_aborted' ? 'Review target analysis timed out. Try again for this selected period.' : 'Review targets are unavailable for this selected period.');
   }
 }
 
@@ -1549,8 +1718,13 @@ function fmtPointDelta(current, previous) {
 function buildRevChart(labels, revenue, sessions) {
   const ctx = document.getElementById('revChart');
   if (!ctx) return;
+  labels = labels || [];
+  revenue = revenue || [];
+  sessions = sessions || [];
   setChartOverlay('revChart', labels && labels.length ? '' : 'GA4 ecommerce revenue and sessions are unavailable or empty for this selected period.');
-  if (revChartInst) revChartInst.destroy();
+  destroyChart(revChartInst);
+  revChartInst = null;
+  if (chartUnavailable('revChart') || !(labels && labels.length)) return;
   const theme = chartTheme();
   revChartInst = new Chart(ctx, {
     type: 'line',
@@ -1577,8 +1751,19 @@ function buildRevChart(labels, revenue, sessions) {
 function buildDonutChart(sources) {
   const ctx = document.getElementById('donutChart');
   if (!ctx) return;
+  sources = sources || [];
   setChartOverlay('donutChart', sources && sources.length ? '' : 'GA4 traffic-source breakdown is unavailable or empty for this selected period.');
-  if (donutChartInst) donutChartInst.destroy();
+  destroyChart(donutChartInst);
+  donutChartInst = null;
+  if (chartUnavailable('donutChart') || !(sources && sources.length)) {
+    const centerValue = document.querySelector('.donut-val');
+    const centerLabel = document.querySelector('.donut-sub');
+    if (centerValue) centerValue.textContent = '—';
+    if (centerLabel) centerLabel.textContent = window.Chart ? 'unavailable' : 'chart unavailable';
+    const legend = document.querySelector('.legend-list');
+    if (legend) legend.innerHTML = emptyState(window.Chart ? 'Traffic source data is empty for this selected period.' : 'Traffic source chart is unavailable because Chart.js did not load.');
+    return;
+  }
   const theme = chartTheme();
   donutChartInst = new Chart(ctx, {
     type: 'doughnut',
@@ -1609,12 +1794,16 @@ function buildDonutChart(sources) {
 function buildCatChart(categories) {
   const ctx = document.getElementById('catChart');
   if (!ctx) return;
+  categories = categories || [];
   setChartOverlay('catChart', categories && categories.length ? '' : 'Magento category order-line revenue is unavailable or empty for this selected period.');
-  if (catChartInst) catChartInst.destroy();
+  destroyChart(catChartInst);
+  catChartInst = null;
+  const hasChartData = categories && categories.length;
+  const skipChart = chartUnavailable('catChart') || !hasChartData;
   const theme = chartTheme();
   // Chart shows top 10 only — trend table shows all 25
   const chartCats = categories.slice(0, 10);
-  catChartInst = new Chart(ctx, {
+  if (!skipChart) catChartInst = new Chart(ctx, {
     type:'bar',
     data: {
       labels: chartCats.map(c => c.name),
@@ -1660,6 +1849,32 @@ function fmtDropoffRevenue(value) {
   return '$' + (Number(value || 0) / 1000).toFixed(1) + 'K';
 }
 
+function termTokens(term) {
+  return String(term || '').toLowerCase().split(/[^a-z0-9]+/).filter(token => token.length >= 3 && !/^\d+$/.test(token));
+}
+
+function repeatedSearchTokens(terms) {
+  const counts = {};
+  (terms || []).forEach(term => {
+    new Set(termTokens(term.search_term)).forEach(token => {
+      counts[token] = (counts[token] || 0) + 1;
+    });
+  });
+  return new Set(Object.entries(counts).filter(([, count]) => count >= 3).map(([token]) => token));
+}
+
+function searchReviewTags(term, maxSessions, repeatedTokens) {
+  const tags = [];
+  const sessions = Number(term.sessions || 0);
+  const label = String(term.search_term || '');
+  const skuLike = term.is_sku_like || (/[a-z]/i.test(label) && /\d/.test(label));
+  if (sessions >= Math.max(25, maxSessions * 0.45)) tags.push({ label: 'High volume', cls: 'strong' });
+  if (skuLike) tags.push({ label: 'SKU-like', cls: 'sku' });
+  if (termTokens(label).some(token => repeatedTokens.has(token))) tags.push({ label: 'Repeated wording', cls: 'warn' });
+  if (!tags.length) tags.push({ label: 'Monitor', cls: '' });
+  return tags.slice(0, 3);
+}
+
 function renderSearchTerms(data) {
   const list = document.getElementById('search-terms-list');
   const label = document.getElementById('search-terms-label');
@@ -1670,6 +1885,7 @@ function renderSearchTerms(data) {
   document.getElementById('kpi-search-total').querySelector('.kpi-value').textContent = fmtSearchCount(data.total_search_sessions);
   document.getElementById('kpi-search-unique').querySelector('.kpi-value').textContent = fmtSearchCount(data.unique_terms);
   document.getElementById('kpi-search-blanks').querySelector('.kpi-value').textContent = fmtSearchCount(data.blank_sessions_filtered);
+  document.getElementById('kpi-search-blanks').querySelector('.kpi-delta').textContent = Number(data.blank_sessions_filtered || 0) > 0 ? 'Filtered from review list' : 'No blank rows in fetched data';
 
   const top = data.top_term;
   const topCard = document.getElementById('kpi-search-top');
@@ -1689,19 +1905,23 @@ function renderSearchTerms(data) {
   }
 
   const maxSessions = Math.max(...terms.map(t => t.sessions), 1);
+  const repeatedTokens = repeatedSearchTokens(terms);
   list.innerHTML = `
     <div style="display:flex;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:2px;">
       <div style="width:28px;flex-shrink:0;"></div>
       <div style="flex:1;font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;">Search term</div>
       <div style="width:90px;text-align:right;font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;">Sessions</div>
-      <div style="width:110px;flex-shrink:0;"></div>
+      <div style="min-width:130px;text-align:right;font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;">Review cue</div>
+      <div style="width:70px;flex-shrink:0;"></div>
     </div>
     ${terms.map((t, i) => {
       const barW = Math.max(4, Math.round((t.sessions / maxSessions) * 100));
+      const tags = searchReviewTags(t, maxSessions, repeatedTokens);
       return `<div class="seo-row">
         <div class="seo-rank">${String(i+1).padStart(2,'0')}</div>
         <div class="seo-page" title="${escapeHTML(t.search_term)}"><strong>${escapeHTML(t.search_term)}</strong></div>
         <div class="seo-impr">${fmtSearchCount(t.sessions)}</div>
+        <div class="review-tags">${tags.map(tag => `<span class="review-tag ${tag.cls}">${escapeHTML(tag.label)}</span>`).join('')}</div>
         <div class="ctr-track"><div class="ctr-fill" style="width:${barW}%;background:${t.is_sku_like ? 'var(--accent)' : 'var(--green)'}"></div></div>
       </div>`;
     }).join('')}`;
@@ -1728,8 +1948,11 @@ async function loadSearchIntelligence() {
 function buildSeoChart(pages) {
   const ctx = document.getElementById('seoChart');
   if (!ctx) return;
+  pages = pages || [];
   setChartOverlay('seoChart', pages && pages.length ? '' : 'Search Console top-page sample is unavailable or empty for this selected period.');
-  if (seoChartInst) seoChartInst.destroy();
+  destroyChart(seoChartInst);
+  seoChartInst = null;
+  if (chartUnavailable('seoChart') || !(pages && pages.length)) return;
   const theme = chartTheme();
   const scatterData = pages.map(p => ({
     x: parseFloat((p.impressions/1000).toFixed(1)),
@@ -1761,8 +1984,11 @@ function buildSeoChart(pages) {
 function buildMerchChart(products) {
   const ctx = document.getElementById('merchChart');
   if (!ctx) return;
+  products = products || [];
   setChartOverlay('merchChart', products && products.length ? '' : 'Magento product order-line revenue is unavailable or empty for this selected period.');
-  if (merchChartInst) merchChartInst.destroy();
+  destroyChart(merchChartInst);
+  merchChartInst = null;
+  if (chartUnavailable('merchChart') || !(products && products.length)) return;
   const theme = chartTheme();
   merchChartInst = new Chart(ctx, {
     type:'bar',
@@ -1862,6 +2088,9 @@ async function loadDashboard() {
     const { categories = [], period } = catRes.data;
     updatePeriodCoverage(period);
     buildCatChart(categories);
+    const decliningCategories = categories
+      .filter(c => c.delta !== null && c.delta !== undefined && Number(c.delta) <= -20)
+      .slice(0, 3);
     if (categories.length) {
       const top = categories[0];
       const rev = top.revenue >= 1000000 ? '$'+(top.revenue/1000000).toFixed(2)+'M' : '$'+(top.revenue/1000).toFixed(1)+'K';
@@ -1875,30 +2104,33 @@ async function loadDashboard() {
         deltaEl.title = deltaEl.textContent;
       }
       setKPI('kpi-merch-categories', categories.length, 'neu', 'Compared categories; totals may overlap');
-      updateExecutiveSignals({ topCategory: top });
+      updateExecutiveSignals({ topCategory: top, decliningCategories });
     } else {
       setKPI('kpi-merch-topcategory', '-', 'neu', 'No category order-line revenue');
       setKPI('kpi-merch-categories', '0', 'neu', 'No categories with order-line revenue');
-      updateExecutiveSignals({ topCategory: null });
+      updateExecutiveSignals({ topCategory: null, decliningCategories: [] });
     }
   } else {
     buildCatChart([]);
     setKPI('kpi-merch-topcategory', '-', 'neu', 'Magento unavailable');
     setKPI('kpi-merch-categories', '-', 'neu', 'Magento unavailable');
-    updateExecutiveSignals({ topCategory: null });
+    updateExecutiveSignals({ topCategory: null, decliningCategories: [] });
   }
 
   if (seoRes.ok) {
     const { pages = [], low_ctr_count = 0 } = seoRes.data;
+    const lowCtrPages = pages
+      .filter(p => p.impressions > 5000 && p.ctr < 2.0)
+      .slice(0, 3);
     buildSeoChart(pages);
     renderSeoPageList(pages, 'empty');
     setKPI('kpi-low-ctr', low_ctr_count, 'neu', 'Among fetched top pages');
-    updateExecutiveSignals({ lowCtrCount: low_ctr_count });
+    updateExecutiveSignals({ lowCtrCount: low_ctr_count, lowCtrPages });
   } else {
     buildSeoChart([]);
     renderSeoPageList([], 'unavailable');
     setKPI('kpi-low-ctr', '-', 'neu', 'Search Console unavailable');
-    updateExecutiveSignals({ lowCtrCount: null });
+    updateExecutiveSignals({ lowCtrCount: null, lowCtrPages: [] });
   }
 
   if (gscRes.ok) {
@@ -1937,7 +2169,7 @@ async function loadDashboard() {
     const list  = document.getElementById('product-dropoff-list');
     const products = d.products || [];
     const count = products.length;
-    updateExecutiveSignals({ dropoffCount: count });
+    updateExecutiveSignals({ dropoffCount: count, dropoffProducts: products.slice(0, 3) });
     if (el) {
       el.querySelector('.kpi-value').textContent = count;
       el.querySelector('.kpi-delta').className = count > 0 ? 'kpi-delta dn' : 'kpi-delta neu';
@@ -1958,10 +2190,17 @@ async function loadDashboard() {
           <div class="trend-delta dn">${delta}</div>
         </div>`;
       }).join('');
-    } else if (panel) panel.style.display = 'none';
+    } else if (panel && list) {
+      panel.style.display = 'block';
+      const criteria = d.criteria || {};
+      const minimumDrop = Number(criteria.minimum_revenue_drop || 250).toLocaleString();
+      const minimumDelta = Math.abs(Number(criteria.minimum_delta_percent || -35));
+      const pool = criteria.candidate_limit || 50;
+      list.innerHTML = emptyState(`No products met the drop-off threshold for this selected period. Checked the prior-period top ${pool} candidates and looked for at least $${minimumDrop} in revenue drop plus either zero current-period revenue or a decline of at least ${minimumDelta}%.`);
+    }
   } else {
     setKPI('kpi-merch-dropoffs', '-', 'neu', 'Magento unavailable');
-    updateExecutiveSignals({ dropoffCount: null });
+    updateExecutiveSignals({ dropoffCount: null, dropoffProducts: [] });
     const panel = document.getElementById('product-dropoff-panel');
     if (panel) panel.style.display = 'none';
   }
@@ -2028,8 +2267,9 @@ function renderOpportunities(data) {
   if (!list) return;
   renderSourceCoverage(data, 'opp-source-coverage');
   const items = data.opportunities || [];
+  updateExecutiveSignals({ reviewTargetCount: items.length || null });
   if (!items.length) {
-    list.innerHTML = emptyState(data.fallback ? 'OpenAI was unavailable, and no deterministic review targets were strong enough to show.' : 'No significant review targets detected in current data.');
+    list.innerHTML = emptyState(data.fallback ? 'AI was unavailable, and the rule-based fallback did not find review targets strong enough to show.' : 'No significant review targets detected in current data.');
     return;
   }
   const BG = { high:'rgba(255,79,106,0.1)', med:'rgba(245,158,11,0.1)', low:'rgba(34,199,125,0.1)' };
@@ -2042,17 +2282,30 @@ function renderOpportunities(data) {
     review_related_products: 'Check related products',
     review_category_navigation: 'Review category links'
   };
+  const PRIORITY_LABELS = { high: 'High signal', med: 'Medium signal', low: 'Low signal' };
+  const sourceForOpportunity = (item) => {
+    const text = `${item.action || ''} ${item.title || ''} ${item.desc || ''}`.toLowerCase();
+    if (text.includes('search') || text.includes('ctr') || text.includes('snippet')) return 'Search Console';
+    if (text.includes('category') || text.includes('product') || text.includes('sku') || text.includes('magento')) return 'Magento';
+    return 'Dashboard data';
+  };
   list.innerHTML = items.map(o => {
     const priority = ['high', 'med', 'low'].includes(o.priority) ? o.priority : 'low';
     const actionLabel = o.action_label || ACTION_LABELS[o.action] || o.action || 'Focused review';
+    const target = o.target || o.review_target || o.url || o.sku || o.category || 'Selected signal';
     return `
     <div class="opp-card">
       <div class="opp-icon" style="background:${BG[priority]||BG.low}">${escapeHTML(o.icon || '📊')}</div>
       <div class="opp-content">
         <div class="opp-title">${escapeHTML(o.title)}</div>
-        <div class="opp-desc">${escapeHTML(o.desc)} · <span style="font-size:11px;color:var(--accent2)">${escapeHTML(actionLabel)}</span></div>
+        <div class="opp-desc">${escapeHTML(o.desc)}</div>
+        <div class="opp-evidence">
+          <span class="evidence-pill"><strong>Source</strong> ${escapeHTML(sourceForOpportunity(o))}</span>
+          <span class="evidence-pill"><strong>Target</strong> ${escapeHTML(target)}</span>
+          <span class="evidence-pill"><strong>Scope</strong> ${escapeHTML(actionLabel)}</span>
+        </div>
       </div>
-      <div class="priority-tag ${priority}">${priority==='med'?'Medium':priority.charAt(0).toUpperCase()+priority.slice(1)}</div>
+      <div class="priority-tag ${priority}">${PRIORITY_LABELS[priority]}</div>
     </div>
   `;
   }).join('');
@@ -2071,7 +2324,7 @@ function renderAiSummary(data) {
   if (time && data.generated_at) {
     const d = new Date(data.generated_at);
     const period = data.period && data.period.label ? data.period.label + ' · ' : '';
-    const partial = data.partial_data ? ' · Limited source data' : data.fallback ? ' · Deterministic fallback' : '';
+    const partial = data.partial_data ? ' · Limited source data' : data.fallback ? ' · Rule-based fallback' : '';
     time.textContent = period + 'Generated ' + d.toLocaleTimeString() + partial;
   }
 
@@ -2102,6 +2355,7 @@ function renderAiSummary(data) {
 }
 
 // Kick it all off
+restoreActivePage();
 loadDashboard();
 </script>
 </body>

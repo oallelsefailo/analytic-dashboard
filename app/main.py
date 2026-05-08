@@ -266,7 +266,7 @@ def has_broad_work_language(text: str):
 def ai_summary_limit(ctx):
     days = ctx.get("days", 30)
     if days <= 45:
-        return 5
+        return 4
     if days <= 120:
         return 4
     return 3
@@ -274,7 +274,7 @@ def ai_summary_limit(ctx):
 def ai_opportunity_limit(ctx):
     days = ctx.get("days", 30)
     if days <= 45:
-        return 6
+        return 5
     if days <= 120:
         return 5
     return 4
@@ -282,7 +282,7 @@ def ai_opportunity_limit(ctx):
 def ai_count_guidance(ctx, item_type, max_count):
     days = ctx.get("days", 30)
     if days <= 45:
-        return f"For this short operational range, aim for 3-{max_count} {item_type} when the source data has distinct signals. Return fewer only when the data truly does not support more."
+        return f"For this short operational range, return up to {max_count} {item_type}; 2-3 strong items are better than filling the list. Return fewer when the data does not show distinct signals."
     if days <= 120:
         return f"For this quarterly-style range, return up to {max_count} {item_type}; 2-4 strong items are better than filler."
     return f"For this long-term range, return up to {max_count} durable {item_type}; fewer is acceptable when signals are stable or repetitive."
