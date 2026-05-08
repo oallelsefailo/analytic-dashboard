@@ -258,11 +258,15 @@
     border-radius: 6px; padding: 5px 10px;
     font-size: 11.5px; color: var(--green); font-weight: 500;
   }
+  .live-badge.partial { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.25); color: var(--amber); }
+  .live-badge.offline { background: rgba(255,79,106,0.08); border-color: rgba(255,79,106,0.25); color: var(--red); }
 
   .live-dot {
     width: 6px; height: 6px; border-radius: 50%;
     background: var(--green); animation: pulse 2s infinite;
   }
+  .live-badge.partial .live-dot { background: var(--amber); }
+  .live-badge.offline .live-dot { background: var(--red); }
 
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
 
@@ -511,6 +515,30 @@
 
   .ai-divider { border: none; border-top: 1px solid rgba(61,127,255,0.07); }
 
+  @media (max-width: 1100px) {
+    body { overflow: auto; }
+    .shell { min-height: 100vh; height: auto; }
+    .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .two-col, .wide-col { grid-template-columns: 1fr; }
+    .topbar { align-items: flex-start; gap: 12px; }
+    .topbar-right { flex-wrap: wrap; justify-content: flex-end; }
+  }
+
+  @media (max-width: 760px) {
+    .shell { flex-direction: column; }
+    .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+    .sidebar-footer { display: none; }
+    .nav-section { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; }
+    .nav-label { width: 100%; }
+    .nav-item { margin-bottom: 0; }
+    .topbar { position: static; flex-direction: column; padding: 14px 16px; }
+    .topbar-right { width: 100%; justify-content: flex-start; }
+    .content { padding: 16px; }
+    .kpi-grid { grid-template-columns: 1fr; }
+    .panel-header { align-items: flex-start; gap: 10px; flex-direction: column; }
+    .donut-wrap { width: 120px; height: 120px; }
+  }
+
   @media print {
     body { background: #fff !important; color: #111 !important; }
     .shell { display: block !important; }
@@ -559,6 +587,18 @@
   }
   .ds-chip.connected { border-color: rgba(34,199,125,0.3); color: var(--green); }
   .ds-chip.pending   { border-color: rgba(245,158,11,0.3); color: var(--amber); }
+  .ds-chip.unavailable { border-color: rgba(255,79,106,0.3); color: var(--red); }
+  .period-coverage {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: -10px;
+  }
+  .empty-state {
+    color: var(--text3);
+    font-size: 13px;
+    padding: 16px 0;
+    line-height: 1.6;
+  }
 </style>
 </head>
 <body>
@@ -691,7 +731,7 @@
           <span id="theme-icon">☀️</span>
         </button>
 
-        <div class="live-badge">
+        <div class="live-badge pending" id="live-badge">
           <div class="live-dot"></div> Live
         </div>
       </div>
@@ -705,10 +745,11 @@
       <!-- Data source status bar -->
       <div class="data-source-bar">
         <span>Data sources:</span>
-        <span class="ds-chip connected">● GA4</span>
-        <span class="ds-chip connected">● Search Console</span>
-        <span class="ds-chip connected">● Magento 2</span>
+        <span class="ds-chip pending" id="ds-ga4">GA4 checking</span>
+        <span class="ds-chip pending" id="ds-gsc">Search Console checking</span>
+        <span class="ds-chip pending" id="ds-magento">Magento 2 checking</span>
       </div>
+      <div class="period-coverage" id="period-coverage">Selected analytics period will appear after data loads.</div>
 
       <!-- KPIs -->
       <div class="kpi-grid">
@@ -717,32 +758,32 @@
             <div class="kpi-label">Total Revenue</div>
             <div class="kpi-icon blue">💰</div>
           </div>
-          <div class="kpi-value">$284,920</div>
-          <div class="kpi-delta up">▲ 12.4% vs prior period</div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Loading GA4</div>
         </div>
         <div class="kpi-card green" id="kpi-sessions" title="Total number of visits to the website. One session = one visit, regardless of how many pages were viewed.">
           <div class="kpi-header">
             <div class="kpi-label">Sessions</div>
             <div class="kpi-icon green">👥</div>
           </div>
-          <div class="kpi-value">41,882</div>
-          <div class="kpi-delta up">▲ 8.1% vs prior period</div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Loading GA4</div>
         </div>
-        <div class="kpi-card red" id="kpi-conversion" title="Out of every 100 visitors, how many placed an order. Higher is better. Industry average for B2B is 1-3%.">
+        <div class="kpi-card red" id="kpi-conversion" title="GA4 sessionConversionRate for the selected period, shown as a percentage. This follows the conversion events configured in GA4.">
           <div class="kpi-header">
-            <div class="kpi-label">Orders per 100 Visitors</div>
+            <div class="kpi-label">Session Conversion Rate</div>
             <div class="kpi-icon red">🎯</div>
           </div>
-          <div class="kpi-value">2.31%</div>
-          <div class="kpi-delta dn">▼ down vs prior period</div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Loading GA4</div>
         </div>
         <div class="kpi-card purple" id="kpi-engagement" title="Percentage of visitors who actively engaged with the site — scrolled, clicked, or spent 10+ seconds on a page. Higher means visitors found what they were looking for.">
           <div class="kpi-header">
             <div class="kpi-label">Visitor Engagement Rate</div>
             <div class="kpi-icon purple">🔍</div>
           </div>
-          <div class="kpi-value">63.4%</div>
-          <div class="kpi-delta neu">— flat vs prior period</div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Loading GA4</div>
         </div>
       </div>
 
@@ -771,23 +812,14 @@
           <div class="panel-body">
             <div style="display:flex; align-items:center; gap:20px;">
               <div class="donut-wrap">
-                <canvas id="donutChart" role="img" aria-label="Donut chart: Organic 48%, Direct 22%, Referral 18%, Paid 12%">Traffic: Organic 48%, Direct 22%, Referral 18%, Paid 12%.</canvas>
+                <canvas id="donutChart" role="img" aria-label="Donut chart of traffic sources">Traffic source chart.</canvas>
                 <div class="donut-center">
-                  <div class="donut-val">48%</div>
-                  <div class="donut-sub">organic</div>
+                  <div class="donut-val">—</div>
+                  <div class="donut-sub">loading</div>
                 </div>
               </div>
               <div class="legend-list">
-                <div class="legend-item"><div class="legend-swatch" style="background:#3d7fff"></div><div class="legend-label">Organic</div><div class="legend-val">48%</div></div>
-                <div class="legend-item"><div class="legend-swatch" style="background:#9b72ff"></div><div class="legend-label">Direct</div><div class="legend-val">22%</div></div>
-                <div class="legend-item"><div class="legend-swatch" style="background:#0fd4b8"></div><div class="legend-label">Referral</div><div class="legend-val">18%</div></div>
-                <div class="legend-item"><div class="legend-swatch" style="background:#f59e0b"></div><div class="legend-label">Paid</div><div class="legend-val">12%</div></div>
-                <div style="margin-top:10px;font-size:11px;color:var(--text3);line-height:1.7;">
-                  <div><b style="color:var(--text2)">Organic</b> — found you via Google</div>
-                  <div><b style="color:var(--text2)">Direct</b> — typed your URL directly</div>
-                  <div><b style="color:var(--text2)">Referral</b> — clicked a link on another site</div>
-                  <div><b style="color:var(--text2)">Paid</b> — came from an ad</div>
-                </div>
+                <div class="empty-state">Loading traffic sources...</div>
               </div>
             </div>
           </div>
@@ -829,20 +861,20 @@
         <div class="kpi-card blue" id="kpi-search-total" title="GA4 sessions with an on-site search term in the selected period. Blank searchTerm rows are filtered out.">
           <div class="kpi-header"><div class="kpi-label">Search Sessions</div><div class="kpi-icon blue">🔍</div></div>
           <div class="kpi-value">—</div>
-          <div class="kpi-delta neu">GA4 searchTerm</div>
+          <div class="kpi-delta neu">Searches with Terms</div>
         </div>
         <div class="kpi-card green" id="kpi-search-unique" title="Unique on-site search terms after case-insensitive grouping.">
           <div class="kpi-header"><div class="kpi-label">Unique Terms</div><div class="kpi-icon green">#</div></div>
           <div class="kpi-value">—</div>
-          <div class="kpi-delta neu">Case-grouped</div>
+          <div class="kpi-delta neu">Grouped Similar Searches</div>
         </div>
         <div class="kpi-card purple" id="kpi-search-top" title="The highest-volume customer search term in this period.">
           <div class="kpi-header"><div class="kpi-label">Top Search</div><div class="kpi-icon purple">★</div></div>
           <div class="kpi-value">—</div>
           <div class="kpi-delta neu">Loading...</div>
         </div>
-        <div class="kpi-card red" id="kpi-search-blanks" title="GA4 searchTerm rows without a usable term. These are filtered from the table.">
-          <div class="kpi-header"><div class="kpi-label">Blank Rows Filtered</div><div class="kpi-icon red">∅</div></div>
+        <div class="kpi-card red" id="kpi-search-blanks" title="GA4 on-site search rows without a usable term. These are filtered from the table.">
+          <div class="kpi-header"><div class="kpi-label">Filtered Empty Searches</div><div class="kpi-icon red">∅</div></div>
           <div class="kpi-value">—</div>
           <div class="kpi-delta neu">Excluded from terms</div>
         </div>
@@ -857,18 +889,6 @@
           <div class="spinner"><div class="spinner-ring"></div>Loading search terms...</div>
         </div>
       </div>
-      <div style="display:none;">
-        <div style="font-size:48px;">🔧</div>
-        <div style="font-size:20px;font-weight:600;color:var(--text)">Legacy search placeholder</div>
-        <div style="font-size:14px;color:var(--text3);max-width:480px;line-height:1.7;">
-          Legacy placeholder retained hidden for layout safety.
-          <br><br>
-          Live search terms now render above.
-        </div>
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 24px;font-size:13px;color:var(--text2);">
-          Hidden fallback.
-        </div>
-      </div>
     </div>
 
     <!-- ══════════════════════════════════════
@@ -878,30 +898,30 @@
       <div class="kpi-grid">
         <div class="kpi-card blue" id="kpi-impressions" title="Total number of times your pages appeared in Google search results during this period. Does not mean they clicked — just that your page was shown.">
           <div class="kpi-header"><div class="kpi-label">Total Impressions</div><div class="kpi-icon blue">👁</div></div>
-          <div class="kpi-value">1.24M</div>
-          <div class="kpi-delta up">▲ 9.2%</div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Loading Search Console</div>
         </div>
         <div class="kpi-card green" id="kpi-position" title="Your average ranking position in Google search results. Position 1 is the top result. Lower number is better — position 5 is better than position 15.">
           <div class="kpi-header"><div class="kpi-label">Avg. Position in Google</div><div class="kpi-icon green">📍</div></div>
-          <div class="kpi-value">14.3</div>
-          <div class="kpi-delta up">▲ improved 2.1</div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Loading Search Console</div>
         </div>
         <div class="kpi-card red" id="kpi-ctr" title="Out of everyone who saw your pages in Google search results, what percentage actually clicked through to your site. Industry average is 2-5%.">
           <div class="kpi-header"><div class="kpi-label">Avg. Click-Through Rate</div><div class="kpi-icon red">→</div></div>
-          <div class="kpi-value">2.8%</div>
-          <div class="kpi-delta dn">▼ down vs prior period</div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Loading Search Console</div>
         </div>
         <div class="kpi-card purple" id="kpi-low-ctr" title="Pages with more than 5,000 impressions but less than 2% click-through rate. These are pages Google shows frequently but visitors don't click — a sign the page title or description could be improved.">
-          <div class="kpi-header"><div class="kpi-label">Low CTR Pages</div><div class="kpi-icon purple">⚠</div></div>
-          <div class="kpi-value">38</div>
-          <div class="kpi-delta dn">▲ needs attention</div>
+          <div class="kpi-header"><div class="kpi-label">Low Click-Rate Pages</div><div class="kpi-icon purple">⚠</div></div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-delta neu">Loading Search Console</div>
         </div>
       </div>
 
       <div class="two-col">
         <div class="panel">
           <div class="panel-header">
-            <div class="panel-title"><div class="dot amber"></div>High Impressions · Low CTR — Top Opportunities</div>
+            <div class="panel-title"><div class="dot amber"></div>High Impressions · Low Click Rate — Top Opportunities</div>
             <div style="display:flex;align-items:center;gap:12px;">
               <span style="font-size:11px;color:var(--text3)">Bar = impressions · % = click rate</span>
               <span class="panel-tag blue">Search Console</span>
@@ -955,12 +975,12 @@
       <div class="two-col">
         <div class="panel">
           <div class="panel-header">
-            <div class="panel-title"><div class="dot blue"></div><span id="merch-products-label">Top Products by Revenue — Last 30 Days</span></div>
+            <div class="panel-title"><div class="dot blue"></div><span id="merch-products-label">Top Products by Revenue — Selected Period</span></div>
             <span class="panel-tag blue">Magento</span>
           </div>
           <div class="panel-body">
             <div class="chart-wrap">
-              <canvas id="merchChart" role="img" aria-label="Bar chart of products frequently viewed but not purchased">Products with highest view-without-purchase count.</canvas>
+              <canvas id="merchChart" role="img" aria-label="Bar chart of top Magento products by revenue">Top Magento products by revenue.</canvas>
             </div>
           </div>
         </div>
@@ -992,7 +1012,7 @@
       <div class="ai-panel">
         <div class="ai-header">
           <div class="ai-badge">AI Summary</div>
-          <div class="ai-title">Executive Brief · Live Data</div>
+          <div class="ai-title">Executive Brief</div>
           <div class="ai-time" id="ai-generated-time">Loading...</div>
           <button onclick="printAiSummary()" id="ai-print-btn" style="margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 12px;font-size:12px;color:var(--text2);cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:6px;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M3 4V1h7v3M3 9H1V5h11v4h-2M3 7h7v5H3z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
@@ -1012,7 +1032,7 @@
       <div class="panel">
         <div class="panel-header">
           <div class="panel-title"><div class="dot amber"></div>Focused Opportunities</div>
-          <span class="panel-tag teal">Live Data</span>
+          <span class="panel-tag teal">AI Review</span>
         </div>
         <div class="panel-body">
           <div class="opp-list" id="opp-list">
@@ -1048,7 +1068,6 @@ function rebuildChartsOnly() {
   if (revChartInst)    { revChartInst.update(); }
   if (donutChartInst)  { donutChartInst.update(); }
   if (catChartInst)    { catChartInst.update(); }
-  if (searchChartInst) { searchChartInst.update(); }
   if (seoChartInst)    { seoChartInst.update(); }
   if (merchChartInst)  { merchChartInst.update(); }
 }
@@ -1103,6 +1122,49 @@ function escapeHTML(value) {
     '"': '&quot;',
     "'": '&#39;'
   }[ch]));
+}
+
+function emptyState(message) {
+  return `<div class="empty-state">${escapeHTML(message)}</div>`;
+}
+
+function setSourceStatus(source, status, label) {
+  const el = document.getElementById(`ds-${source}`);
+  if (!el) return;
+  el.className = `ds-chip ${status}`;
+  el.textContent = label;
+}
+
+function updateLiveBadge() {
+  const badge = document.getElementById('live-badge');
+  if (!badge) return;
+  const chips = ['ds-ga4', 'ds-gsc', 'ds-magento']
+    .map(id => document.getElementById(id))
+    .filter(Boolean);
+  const unavailable = chips.filter(chip => chip.classList.contains('unavailable')).length;
+  const pending = chips.filter(chip => chip.classList.contains('pending')).length;
+  badge.className = unavailable === chips.length ? 'live-badge offline' : unavailable || pending ? 'live-badge partial' : 'live-badge';
+  badge.innerHTML = `<div class="live-dot"></div>${unavailable === chips.length ? 'Unavailable' : unavailable || pending ? 'Partial' : 'Live'}`;
+}
+
+function resetSourceStatuses() {
+  setSourceStatus('ga4', 'pending', 'GA4 checking');
+  setSourceStatus('gsc', 'pending', 'Search Console checking');
+  setSourceStatus('magento', 'pending', 'Magento 2 checking');
+  updateLiveBadge();
+}
+
+function formatDisplayDate(value) {
+  if (!value) return '';
+  return parseDateInput(value).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+
+function updatePeriodCoverage(period) {
+  const el = document.getElementById('period-coverage');
+  if (!el || !period) return;
+  const selected = `${formatDisplayDate(period.start_date)} through ${formatDisplayDate(period.end_date)}`;
+  const comparison = period.comparison ? ` Compared with ${formatDisplayDate(period.comparison.start_date)} through ${formatDisplayDate(period.comparison.end_date)}.` : '';
+  el.textContent = `${selected}.${comparison}`;
 }
 
 function toggleDatePicker() {
@@ -1168,6 +1230,9 @@ function applyCustomRange() {
 
   const ms   = parseDateInput(end) - parseDateInput(start);
   const days = Math.round(ms / (1000 * 60 * 60 * 24)) + 1;
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  if (parseDateInput(end) >= today) { alert('Custom ranges must end before today so analytics data is complete.'); return; }
 
   if (days > 500) { alert('Custom range cannot exceed 500 days.'); return; }
 
@@ -1204,7 +1269,7 @@ const PAGES = {
   search:   { title: 'Search Intelligence',     sub: 'Live customer searches from GA4 + Klevu' },
   seo:      { title: 'SEO Performance',         sub: 'Google Search Console + GA4 · Impressions & CTR' },
   merch:    { title: 'Merchandising',           sub: 'Magento product & category engagement' },
-  ai:       { title: 'AI Summary Panel',        sub: 'GPT-4.1-mini executive brief · Constrained recommendations' },
+  ai:       { title: 'AI Summary Panel',        sub: 'Executive brief · Constrained recommendations' },
   opps:     { title: 'Opportunities',           sub: 'AI-detected · Ranked by estimated impact' }
 };
 
@@ -1228,8 +1293,8 @@ function nav(id, el) {
   }
 
   // Lazy-load AI summary only when navigating to AI page
-  if (id === 'ai' && aiLoadedForDays !== DAYS) {
-    aiLoadedForDays = DAYS;
+  if (id === 'ai' && aiLoadedForDays !== rangeKey()) {
+    aiLoadedForDays = rangeKey();
     const aiBody = document.getElementById('ai-body');
     if (aiBody) aiBody.innerHTML = '<div class="spinner"><div class="spinner-ring"></div>Generating summary — takes a few seconds...</div>';
     const controller = new AbortController();
@@ -1248,8 +1313,8 @@ function nav(id, el) {
   }
 
   // Lazy-load opportunities only when navigating to opportunities page
-  if (id === 'opps' && oppsLoadedForDays !== DAYS) {
-    oppsLoadedForDays = DAYS;
+  if (id === 'opps' && oppsLoadedForDays !== rangeKey()) {
+    oppsLoadedForDays = rangeKey();
     const oppList = document.getElementById('opp-list');
     if (oppList) oppList.innerHTML = '<div class="spinner"><div class="spinner-ring"></div>Analyzing data for opportunities...</div>';
     fetch(API + `/api/opportunities?${apiParams()}`)
@@ -1278,7 +1343,7 @@ function wave(n, base, amp) {
 const L30 = days30Labels();
 
 /* ─── CHART INSTANCES (kept in scope so we can update them) ─── */
-let revChartInst, donutChartInst, catChartInst, searchChartInst, seoChartInst, merchChartInst;
+let revChartInst, donutChartInst, catChartInst, seoChartInst, merchChartInst;
 
 const CHART_COLORS = {
   blue:   ['rgba(61,127,255,0.8)','rgba(61,127,255,0.65)','rgba(61,127,255,0.55)','rgba(61,127,255,0.45)','rgba(255,79,106,0.55)','rgba(61,127,255,0.35)'],
@@ -1315,6 +1380,7 @@ function fmtDelta(val, type) {
 /* ─── BUILD REVENUE + SESSIONS CHART ─── */
 function buildRevChart(labels, revenue, sessions) {
   const ctx = document.getElementById('revChart');
+  if (!ctx) return;
   if (revChartInst) revChartInst.destroy();
   revChartInst = new Chart(ctx, {
     type: 'line',
@@ -1340,6 +1406,7 @@ function buildRevChart(labels, revenue, sessions) {
 /* ─── BUILD DONUT CHART ─── */
 function buildDonutChart(sources) {
   const ctx = document.getElementById('donutChart');
+  if (!ctx) return;
   if (donutChartInst) donutChartInst.destroy();
   donutChartInst = new Chart(ctx, {
     type: 'doughnut',
@@ -1349,21 +1416,25 @@ function buildDonutChart(sources) {
   if (sources.length) {
     document.querySelector('.donut-val').textContent = sources[0].pct + '%';
     document.querySelector('.donut-sub').textContent = sources[0].name.toLowerCase();
+  } else {
+    document.querySelector('.donut-val').textContent = '—';
+    document.querySelector('.donut-sub').textContent = 'unavailable';
   }
   const EXPLAIN = { 'Organic':'Found you via Google search', 'Direct':'Typed your URL or used a bookmark', 'Referral':'Clicked a link on another website', 'Paid Search':'Clicked a paid ad', 'Email':'Clicked a link in an email', 'Social':'Came from social media', 'Unassigned':'Source could not be identified' };
   const legend = document.querySelector('.legend-list');
-  legend.innerHTML = sources.slice(0,5).map((s,i) =>
+  legend.innerHTML = sources.length ? sources.slice(0,5).map((s,i) =>
     `<div class="legend-item" style="align-items:flex-start;gap:9px;margin-bottom:6px;">
       <div class="legend-swatch" style="background:${CHART_COLORS.donut[i]};margin-top:4px;flex-shrink:0"></div>
       <div><div style="font-size:12.5px;color:var(--text);font-weight:500;">${escapeHTML(s.name)} <span style="color:var(--text3);font-weight:400;">${s.pct}%</span></div>
       <div style="font-size:11px;color:var(--text3);margin-top:1px;">${escapeHTML(EXPLAIN[s.name]||'Visited your site')}</div></div>
     </div>`
-  ).join('');
+  ).join('') : emptyState('Traffic source data is unavailable for this period.');
 }
 
 /* ─── BUILD CATEGORY BAR CHART ─── */
 function buildCatChart(categories) {
   const ctx = document.getElementById('catChart');
+  if (!ctx) return;
   if (catChartInst) catChartInst.destroy();
   // Chart shows top 10 only — trend table shows all 25
   const chartCats = categories.slice(0, 10);
@@ -1391,35 +1462,17 @@ function buildCatChart(categories) {
     }
   });
 
-  const trendHTML = categories.map(c => {
+  const trendHTML = categories.length ? categories.map(c => {
     const cls = c.delta === null ? 'neu' : c.delta >= 0 ? 'up' : 'dn';
     const txt = c.delta === null ? '— first data' : (c.delta >= 0 ? '+' : '') + c.delta + '%';
     const rev = c.revenue >= 1000000 ? '$'+(c.revenue/1000000).toFixed(2)+'M' : '$'+(c.revenue/1000).toFixed(1)+'K';
     return `<div class="trend-row"><div class="trend-label">${escapeHTML(c.name)}</div><div class="trend-val">${rev}</div><div class="trend-delta ${cls}">${txt}</div></div>`;
-  }).join('');
+  }).join('') : emptyState('Magento category revenue is unavailable for this period.');
 
   const trendContainer = document.getElementById('trend-rows');
   if (trendContainer) trendContainer.innerHTML = trendHTML;
   const merchTrend = document.getElementById('merch-trend-rows');
   if (merchTrend) merchTrend.innerHTML = trendHTML;
-}
-
-/* ─── BUILD SEARCH CHART (uses GSC daily data) ─── */
-function buildSearchChart(labels, data) {
-  const ctx = document.getElementById('searchChart');
-  if (searchChartInst) searchChartInst.destroy();
-  searchChartInst = new Chart(ctx, {
-    type:'line',
-    data:{ labels, datasets:[{ label:'Sessions from Search', data, borderColor:'#0fd4b8', backgroundColor:'rgba(15,212,184,0.07)', fill:true, tension:0.4, borderWidth:2, pointRadius:0, pointHoverRadius:4 }] },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display:false}, tooltip:TT},
-      scales:{
-        x:{grid:{color:GRID}, ticks:{color:TICKS, font:{size:11}, maxTicksLimit:8}},
-        y:{grid:{color:GRID}, ticks:{color:TICKS, font:{size:11}}}
-      }
-    }
-  });
 }
 
 /* ─── BUILD SEO SCATTER ─── */
@@ -1448,6 +1501,10 @@ function renderSearchTerms(data) {
     topCard.querySelector('.kpi-value').textContent = top.search_term;
     topCard.querySelector('.kpi-delta').textContent = `${fmtSearchCount(top.sessions)} sessions`;
     topCard.querySelector('.kpi-delta').className = 'kpi-delta up';
+  } else if (topCard) {
+    topCard.querySelector('.kpi-value').textContent = '—';
+    topCard.querySelector('.kpi-delta').textContent = 'No top term';
+    topCard.querySelector('.kpi-delta').className = 'kpi-delta neu';
   }
 
   if (!terms.length) {
@@ -1491,11 +1548,12 @@ function loadSearchIntelligence() {
 
 function buildSeoChart(pages) {
   const ctx = document.getElementById('seoChart');
+  if (!ctx) return;
   if (seoChartInst) seoChartInst.destroy();
   const scatterData = pages.map(p => ({
     x: parseFloat((p.impressions/1000).toFixed(1)),
     y: p.ctr,
-    url: p.url.replace('https://www.mockett.com','').replace('https://mockett.com','') || '/'
+    url: String(p.url || '/').replace('https://www.mockett.com','').replace('https://mockett.com','') || '/'
   }));
   seoChartInst = new Chart(ctx, {
     type:'scatter',
@@ -1521,6 +1579,7 @@ function buildSeoChart(pages) {
 /* ─── BUILD MERCH CHART ─── */
 function buildMerchChart(products) {
   const ctx = document.getElementById('merchChart');
+  if (!ctx) return;
   if (merchChartInst) merchChartInst.destroy();
   merchChartInst = new Chart(ctx, {
     type:'bar',
@@ -1559,6 +1618,7 @@ const API = '';
 async function loadDashboard() {
   // Show loading state on everything
   showLoadingState(`Fetching ${currentPeriodLabel()} data...`);
+  resetSourceStatuses();
 
   // Update dynamic period labels
   const periodLabel  = document.getElementById('trend-period-label');
@@ -1593,12 +1653,14 @@ async function loadDashboard() {
       const { labels, revenue, sessions } = await revRes.json();
       buildRevChart(labels, revenue, sessions);
     } else {
-      buildRevChart(L30, wave(30,9000,2200), wave(30,1400,350));
+      buildRevChart([], [], []);
     }
 
     // KPI cards
     if (kpiRes.ok) {
-      const { current, deltas } = await kpiRes.json();
+      const { current, deltas, period } = await kpiRes.json();
+      setSourceStatus('ga4', 'connected', 'GA4 loaded');
+      updatePeriodCoverage(period);
       const sd = fmtDelta(deltas.sessions, 'sessions');
       const rd = fmtDelta(deltas.revenue, 'revenue');
       const cd = fmtDelta(deltas.conversion_rate, 'conversion');
@@ -1615,6 +1677,12 @@ async function loadDashboard() {
       document.getElementById('kpi-engagement').querySelector('.kpi-value').textContent  = current.engagement_rate + '%';
       document.getElementById('kpi-engagement').querySelector('.kpi-delta').className    = 'kpi-delta ' + ed.cls;
       document.getElementById('kpi-engagement').querySelector('.kpi-delta').textContent  = ed.txt;
+    } else {
+      setSourceStatus('ga4', 'unavailable', 'GA4 unavailable');
+      setKPI('kpi-revenue', '—', 'neu', 'GA4 unavailable');
+      setKPI('kpi-sessions', '—', 'neu', 'GA4 unavailable');
+      setKPI('kpi-conversion', '—', 'neu', 'GA4 unavailable');
+      setKPI('kpi-engagement', '—', 'neu', 'GA4 unavailable');
     }
 
     // Traffic sources donut
@@ -1622,12 +1690,14 @@ async function loadDashboard() {
       const { sources } = await srcRes.json();
       buildDonutChart(sources);
     } else {
-      buildDonutChart([{name:'Organic',pct:48},{name:'Direct',pct:22},{name:'Referral',pct:18},{name:'Paid',pct:12}]);
+      buildDonutChart([]);
     }
 
     // Category revenue chart + trend rows + merch KPIs
     if (catRes.ok) {
-      const { categories } = await catRes.json();
+      const { categories, period } = await catRes.json();
+      setSourceStatus('magento', 'connected', 'Magento 2 loaded');
+      updatePeriodCoverage(period);
       buildCatChart(categories);
       // Populate merch KPI cards from real data
       if (categories.length) {
@@ -1645,19 +1715,29 @@ async function loadDashboard() {
         if (countEl) {
           countEl.querySelector('.kpi-value').textContent = categories.length;
         }
+      } else {
+        setKPI('kpi-merch-topcategory', '—', 'neu', 'No category revenue in this period');
+        setKPI('kpi-merch-categories', '0', 'neu', 'No categories with revenue');
       }
     } else {
-      buildCatChart([{name:'DP3 Series',revenue:92410,delta:null}]);
+      setSourceStatus('magento', 'unavailable', 'Magento 2 unavailable');
+      buildCatChart([]);
+      setKPI('kpi-merch-topcategory', '—', 'neu', 'Magento unavailable');
+      setKPI('kpi-merch-categories', '—', 'neu', 'Magento unavailable');
     }
 
     // SEO pages scatter + list + KPI
     if (seoRes.ok) {
       const { pages, low_ctr_count } = await seoRes.json();
+      setSourceStatus('gsc', 'connected', 'Search Console loaded');
       buildSeoChart(pages);
       renderSeoPageList(pages);
       document.getElementById('kpi-low-ctr').querySelector('.kpi-value').textContent = low_ctr_count;
     } else {
-      buildSeoChart([{impressions:48200,ctr:0.9},{impressions:39100,ctr:1.4}]);
+      setSourceStatus('gsc', 'unavailable', 'Search Console unavailable');
+      buildSeoChart([]);
+      renderSeoPageList([]);
+      setKPI('kpi-low-ctr', '—', 'neu', 'Search Console unavailable');
     }
 
     // GSC summary KPIs
@@ -1666,16 +1746,15 @@ async function loadDashboard() {
       document.getElementById('kpi-impressions').querySelector('.kpi-value').textContent = (impressions/1000000).toFixed(2) + 'M';
       document.getElementById('kpi-position').querySelector('.kpi-value').textContent    = position;
       document.getElementById('kpi-ctr').querySelector('.kpi-value').textContent         = ctr + '%';
+    } else {
+      setKPI('kpi-impressions', '—', 'neu', 'Search Console unavailable');
+      setKPI('kpi-position', '—', 'neu', 'Search Console unavailable');
+      setKPI('kpi-ctr', '—', 'neu', 'Search Console unavailable');
     }
+    updateLiveBadge();
 
     // Restore chart opacity now that data is loaded
     hideLoadingState();
-
-    // Search trend chart
-    if (revRes.ok) {
-      const { labels, sessions } = await (await fetch(API + `/api/ga4/sessions-revenue?${apiParams()}`)).json().catch(()=>({labels:L30,sessions:wave(30,620,140)}));
-      buildSearchChart(labels, sessions);
-    }
 
     // Merch top products
     if (vnpRes.ok) {
@@ -1690,7 +1769,12 @@ async function loadDashboard() {
           el.querySelector('.kpi-delta').textContent = rev + ' in selected period';
           el.querySelector('.kpi-delta').className = 'kpi-delta up';
         }
+      } else {
+        setKPI('kpi-merch-topproduct', '—', 'neu', 'No product revenue in this period');
       }
+    } else {
+      buildMerchChart([]);
+      setKPI('kpi-merch-topproduct', '—', 'neu', 'Magento unavailable');
     }
 
     // Range-aware product drop-offs count + detail panel
@@ -1722,6 +1806,10 @@ async function loadDashboard() {
           panel.style.display = 'none';
         }
       }
+    } else {
+      setKPI('kpi-merch-dropoffs', '—', 'neu', 'Magento unavailable');
+      const panel = document.getElementById('product-dropoff-panel');
+      if (panel) panel.style.display = 'none';
     }
 
     // If already on AI or Opps page, re-fetch with new date range
@@ -1742,17 +1830,23 @@ async function loadDashboard() {
     }
 
   } catch (err) {
-    console.warn('Backend not reachable — using mock data.', err);
+    console.warn('Backend not reachable.', err);
     hideLoadingState();
-    buildRevChart(L30, wave(30,9000,2200), wave(30,1400,350));
-    buildDonutChart([{name:'Organic',pct:48},{name:'Direct',pct:22},{name:'Referral',pct:18},{name:'Paid',pct:12}]);
-    buildCatChart([{name:'DP3 Series',revenue:92410,delta:null}]);
-    buildSearchChart(L30, wave(30,620,140));
-    buildSeoChart([{impressions:48200,ctr:0.9},{impressions:39100,ctr:1.4}]);
+    setSourceStatus('ga4', 'unavailable', 'GA4 unavailable');
+    setSourceStatus('gsc', 'unavailable', 'Search Console unavailable');
+    setSourceStatus('magento', 'unavailable', 'Magento 2 unavailable');
+    updateLiveBadge();
+    buildRevChart([], [], []);
+    buildDonutChart([]);
+    buildCatChart([]);
+    buildSeoChart([]);
+    buildMerchChart([]);
+    ['kpi-revenue','kpi-sessions','kpi-conversion','kpi-engagement','kpi-impressions','kpi-position','kpi-ctr','kpi-low-ctr','kpi-merch-topcategory','kpi-merch-topproduct','kpi-merch-dropoffs','kpi-merch-categories'].forEach(id => setKPI(id, '—', 'neu', 'Data unavailable'));
+    renderSeoPageList([]);
     const aiBody = document.getElementById('ai-body');
     const oppList = document.getElementById('opp-list');
-    if (aiBody)  aiBody.innerHTML  = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">⚠️ Google credentials not found. Copy .env and credentials/ folder from your work machine.</div>';
-    if (oppList) oppList.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">⚠️ Cannot load opportunities — API connection failed.</div>';
+    if (aiBody)  aiBody.innerHTML  = emptyState('Dashboard data is unavailable. Check credentials or the backend connection.');
+    if (oppList) oppList.innerHTML = emptyState('Opportunities are unavailable until dashboard data loads.');
   }
 }
 
@@ -1763,8 +1857,13 @@ function renderSeoPageList(pages) {
 
   // Filter to genuine opportunities: high impressions, low CTR
   const opps = pages
-    .filter(p => p.impressions >= 2000 && p.ctr < 3.0)
+    .filter(p => p.impressions > 5000 && p.ctr < 2.0)
     .slice(0, 8);
+
+  if (!opps.length) {
+    el.innerHTML = emptyState('No high-impression, low-click-rate pages found in the fetched Search Console results for this period.');
+    return;
+  }
 
   const maxImpr = Math.max(...opps.map(p => p.impressions), 1);
 
@@ -1777,7 +1876,7 @@ function renderSeoPageList(pages) {
       <div style="width:48px;text-align:right;font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;">CTR</div>
     </div>
     ${opps.map((p, i) => {
-      const path     = p.url.replace('https://www.mockett.com','').replace('https://mockett.com','') || '/';
+      const path     = String(p.url || '/').replace('https://www.mockett.com','').replace('https://mockett.com','') || '/';
       const safePath = escapeHTML(path);
       const imprK    = p.impressions >= 1000 ? (p.impressions/1000).toFixed(1)+'K' : p.impressions;
       const barW     = Math.round((p.impressions / maxImpr) * 100);
@@ -1809,12 +1908,11 @@ function renderOpportunities(data) {
     review_low_ctr_pages: 'Review low-click page',
     review_featured_products: 'Check featured products',
     review_related_products: 'Check related products',
-    review_category_navigation: 'Review category links',
-    review_search_synonyms: 'Review search synonyms'
+    review_category_navigation: 'Review category links'
   };
   list.innerHTML = items.map(o => {
     const priority = ['high', 'med', 'low'].includes(o.priority) ? o.priority : 'low';
-    const actionLabel = ACTION_LABELS[o.action] || o.action || 'Focused review';
+    const actionLabel = o.action_label || ACTION_LABELS[o.action] || o.action || 'Focused review';
     return `
     <div class="opp-card">
       <div class="opp-icon" style="background:${BG[priority]||BG.low}">${escapeHTML(o.icon || '📊')}</div>
@@ -1839,10 +1937,22 @@ function renderAiSummary(data) {
   if (time && data.generated_at) {
     const d = new Date(data.generated_at);
     const period = data.period && data.period.label ? data.period.label + ' · ' : '';
-    time.textContent = period + 'Generated ' + d.toLocaleTimeString() + ' · GPT-4.1-mini';
+    const partial = data.partial_data ? ' · Partial source data' : '';
+    time.textContent = period + 'Generated ' + d.toLocaleTimeString() + partial;
   }
 
   if (!body || !data.insights) return;
+  const ACTION_LABELS = {
+    review_search_snippet_alignment: 'Review search snippet',
+    review_low_ctr_page_copy: 'Review page copy',
+    review_featured_products: 'Check featured products',
+    review_related_products: 'Check related products',
+    review_category_navigation: 'Review category links'
+  };
+  if (!data.insights.length) {
+    body.innerHTML = emptyState('No clear, well-supported AI insights were returned for this period.');
+    return;
+  }
 
   body.innerHTML = data.insights.map((ins, i) => `
     ${i > 0 ? '<hr class="ai-divider">' : ''}
@@ -1851,7 +1961,7 @@ function renderAiSummary(data) {
       <div class="ai-insight-content">
         <div class="ai-insight-title">${escapeHTML(ins.title)}</div>
         <div class="ai-insight-desc">${escapeHTML(ins.description)}</div>
-        ${ins.action ? `<div class="action-chips"><span class="action-chip">${escapeHTML(ins.action)}</span></div>` : ''}
+        ${ins.action ? `<div class="action-chips"><span class="action-chip">${escapeHTML(ins.action_label || ACTION_LABELS[ins.action] || 'Focused review')}</span></div>` : ''}
       </div>
     </div>
   `).join('');

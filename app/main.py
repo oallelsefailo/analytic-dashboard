@@ -3,6 +3,7 @@ Mockett AI Dashboard — FastAPI Backend
 Run: uvicorn main:app --reload --port 8000
 """
 
+import logging
 import os, json, re
 from datetime import date, timedelta, datetime
 from typing import Optional
@@ -25,6 +26,7 @@ from openai import OpenAI
 load_dotenv()
 
 app = FastAPI(title="Mockett AI Dashboard API")
+logger = logging.getLogger("mockett.analytics")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="."), name="static")
 
@@ -108,6 +110,8 @@ def date_range(days: int = 30, start_date: Optional[str] = None, end_date: Optio
             raise HTTPException(400, detail="Both start_date and end_date are required for a custom range")
         if start > end:
             raise HTTPException(400, detail="start_date must be before or equal to end_date")
+        if end >= date.today():
+            raise HTTPException(400, detail="Custom range must end before today")
         if (end - start).days + 1 > 500:
             raise HTTPException(400, detail="Custom range cannot exceed 500 days")
         return start, end
@@ -166,7 +170,8 @@ def mysql_end_exclusive(end_date_value: date):
 def api_error(e):
     if isinstance(e, HTTPException):
         raise e
-    raise HTTPException(500, detail=str(e))
+    logger.exception("API request failed")
+    raise HTTPException(500, detail="Dashboard data is unavailable for this request.")
 
 def rolling_30():
     end        = date.today() - timedelta(days=1)
@@ -194,6 +199,63 @@ def display_search_term(term: str):
     sku_like = any(ch.isdigit() for ch in cleaned)
     if sku_like and any(ch.isalpha() for ch in cleaned):
         return cleaned.upper()
+    return cleaned
+
+ALLOWED_AI_ACTIONS = {
+    "review_search_snippet_alignment",
+    "review_low_ctr_page_copy",
+    "review_featured_products",
+    "review_related_products",
+    "review_category_navigation",
+}
+
+ACTION_LABELS = {
+    "review_search_snippet_alignment": "Review search snippet",
+    "review_low_ctr_page_copy": "Review page copy",
+    "review_featured_products": "Check featured products",
+    "review_related_products": "Check related products",
+    "review_category_navigation": "Review category links",
+}
+
+BROAD_WORK_PATTERNS = [
+    r"\ball\b",
+    r"\bevery\b",
+    r"\bbulk\b",
+    r"\bsitewide\b",
+    r"\bcatalog rewrite\b",
+    r"\btitle-template\b",
+    r"\bredesign\b",
+]
+
+def has_numeric_citation(text: str):
+    return bool(re.search(r"\d", text or ""))
+
+def has_broad_work_language(text: str):
+    lower = (text or "").lower()
+    return any(re.search(pattern, lower) for pattern in BROAD_WORK_PATTERNS)
+
+def clean_ai_items(items, max_count, allowed_actions=ALLOWED_AI_ACTIONS):
+    cleaned = []
+    seen_actions = set()
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        action = item.get("action")
+        description = item.get("desc") or item.get("description") or ""
+        title = item.get("title") or ""
+        if action not in allowed_actions:
+            continue
+        if action in seen_actions:
+            continue
+        if not has_numeric_citation(f"{title} {description}"):
+            continue
+        if has_broad_work_language(f"{title} {description}"):
+            continue
+        seen_actions.add(action)
+        item["action_label"] = ACTION_LABELS.get(action, "Focused review")
+        cleaned.append(item)
+        if len(cleaned) >= max_count:
+            break
     return cleaned
 
 def lm_dates():
@@ -252,11 +314,19 @@ def ga4_kpis(days: int = 30, start_date: Optional[str] = None, end_date: Optiona
                     Metric(name="sessionConversionRate"), Metric(name="engagementRate"),
                 ],
             )
-            row = client.run_report(req).rows[0]
+            rows = client.run_report(req).rows
+            if not rows:
+                return {
+                    "sessions": 0,
+                    "revenue": 0,
+                    "conversion_rate": 0,
+                    "engagement_rate": 0,
+                }
+            row = rows[0]
             return {
                 "sessions":        int(row.metric_values[0].value),
                 "revenue":         round(float(row.metric_values[1].value), 2),
-                "conversion_rate": round(float(row.metric_values[2].value), 4),
+                "conversion_rate": round(float(row.metric_values[2].value) * 100, 2),
                 "engagement_rate": round(float(row.metric_values[3].value) * 100, 2),
             }
 
@@ -266,6 +336,11 @@ def ga4_kpis(days: int = 30, start_date: Optional[str] = None, end_date: Optiona
             "current":  curr,
             "previous": prev,
             "period_days": ctx["days"],
+            "metric_notes": {
+                "revenue": "GA4 purchaseRevenue",
+                "conversion_rate": "GA4 sessionConversionRate, shown as a percentage",
+                "engagement_rate": "GA4 engagementRate, shown as a percentage",
+            },
             "period": {
                 "label": ctx["label"],
                 "start_date": ctx["start_date"],
@@ -424,7 +499,13 @@ def gsc_pages(days: int = 30, limit: int = 20, start_date: Optional[str] = None,
                 "position":    round(row.get("position", 0), 1),
             })
         low_ctr_count = sum(1 for p in pages if p["impressions"] > 5000 and p["ctr"] < 2.0)
-        return {"pages": pages, "low_ctr_count": low_ctr_count}
+        return {
+            "pages": pages,
+            "low_ctr_count": low_ctr_count,
+            "metric_notes": {
+                "low_ctr_count": f"Count of fetched top {limit} Search Console pages with more than 5,000 impressions and less than 2% CTR.",
+            },
+        }
     except Exception as e:
         api_error(e)
 
@@ -474,27 +555,35 @@ def magento_category_revenue(days: int = 30, start_date: Optional[str] = None, e
         prev_end_excl = mysql_end_exclusive(prev_end)
 
         conn = get_magento_conn()
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT
-                    ccevt.value AS name,
-                    SUM(CASE WHEN so.created_at >= %s AND so.created_at < %s THEN soi.row_total ELSE 0 END) AS revenue_current,
-                    SUM(CASE WHEN so.created_at >= %s AND so.created_at < %s THEN soi.row_total ELSE 0 END) AS revenue_previous
-                FROM catalog_category_entity cce
-                JOIN eav_attribute ea ON ea.entity_type_id = 3 AND ea.attribute_code = 'name'
-                JOIN catalog_category_entity_varchar ccevt
-                    ON ccevt.entity_id = cce.entity_id AND ccevt.attribute_id = ea.attribute_id AND ccevt.store_id = 0
-                JOIN catalog_category_product ccp ON ccp.category_id = cce.entity_id
-                JOIN sales_order_item soi ON soi.product_id = ccp.product_id
-                JOIN sales_order so ON so.entity_id = soi.order_id AND so.state NOT IN ('canceled','closed')
-                WHERE cce.level = 2
-                GROUP BY cce.entity_id, ccevt.value
-                HAVING revenue_current > 0 OR revenue_previous > 0
-                ORDER BY revenue_current DESC
-                LIMIT 25
-            """, (start.isoformat(), end_excl, prev_start.isoformat(), prev_end_excl))
-            rows = cur.fetchall()
-        conn.close()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT
+                        ccevt.value AS name,
+                        SUM(CASE WHEN so.created_at >= %s AND so.created_at < %s THEN soi.row_total ELSE 0 END) AS revenue_current,
+                        SUM(CASE WHEN so.created_at >= %s AND so.created_at < %s THEN soi.row_total ELSE 0 END) AS revenue_previous
+                    FROM catalog_category_entity cce
+                    JOIN eav_attribute ea ON ea.entity_type_id = 3 AND ea.attribute_code = 'name'
+                    JOIN catalog_category_entity_varchar ccevt
+                        ON ccevt.entity_id = cce.entity_id AND ccevt.attribute_id = ea.attribute_id AND ccevt.store_id = 0
+                    JOIN catalog_category_product ccp ON ccp.category_id = cce.entity_id
+                    JOIN sales_order_item soi ON soi.product_id = ccp.product_id
+                    JOIN sales_order so ON so.entity_id = soi.order_id AND so.state NOT IN ('canceled','closed')
+                    WHERE cce.level = 2
+                        AND soi.parent_item_id IS NULL
+                        AND so.created_at >= %s AND so.created_at < %s
+                    GROUP BY cce.entity_id, ccevt.value
+                    HAVING revenue_current > 0 OR revenue_previous > 0
+                    ORDER BY revenue_current DESC
+                    LIMIT 25
+                """, (
+                    start.isoformat(), end_excl,
+                    prev_start.isoformat(), prev_end_excl,
+                    prev_start.isoformat(), end_excl,
+                ))
+                rows = cur.fetchall()
+        finally:
+            conn.close()
 
         categories = []
         for row in rows:
@@ -510,6 +599,8 @@ def magento_category_revenue(days: int = 30, start_date: Optional[str] = None, e
             "start_date": ctx["start_date"],
             "end_date": ctx["end_date"],
             "comparison": ctx["comparison"],
+        }, "metric_notes": {
+            "revenue": "Magento parent order-line revenue attributed to each level-2 category. Products in multiple categories may appear under each assigned category.",
         }, "categories": categories}
     except Exception as e:
         api_error(e)
@@ -523,20 +614,22 @@ def magento_top_products(days: int = 30, start_date: Optional[str] = None, end_d
         start = ctx["start"]
         end_excl = mysql_end_exclusive(ctx["end"])
         conn = get_magento_conn()
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT soi.name AS name, soi.sku AS sku, SUM(soi.row_total) AS revenue
-                FROM sales_order_item soi
-                JOIN sales_order so ON so.entity_id = soi.order_id
-                    AND so.state NOT IN ('canceled','closed')
-                    AND so.created_at >= %s AND so.created_at < %s
-                WHERE soi.parent_item_id IS NULL
-                GROUP BY soi.product_id, soi.name, soi.sku
-                ORDER BY revenue DESC
-                LIMIT 8
-            """, (start.isoformat(), end_excl))
-            rows = cur.fetchall()
-        conn.close()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT soi.name AS name, soi.sku AS sku, SUM(soi.row_total) AS revenue
+                    FROM sales_order_item soi
+                    JOIN sales_order so ON so.entity_id = soi.order_id
+                        AND so.state NOT IN ('canceled','closed')
+                        AND so.created_at >= %s AND so.created_at < %s
+                    WHERE soi.parent_item_id IS NULL
+                    GROUP BY soi.product_id, soi.name, soi.sku
+                    ORDER BY revenue DESC
+                    LIMIT 8
+                """, (start.isoformat(), end_excl))
+                rows = cur.fetchall()
+        finally:
+            conn.close()
         return {"period": {
             "label": ctx["label"],
             "start_date": ctx["start_date"],
@@ -561,40 +654,40 @@ def magento_dormant_top_sellers():
         cm_start = date.today().replace(day=1)
 
         conn = get_magento_conn()
-        with conn.cursor() as cur:
-            # Top sellers last month
-            cur.execute("""
-                SELECT soi.product_id, soi.name, soi.sku, SUM(soi.row_total) AS revenue_lm
-                FROM sales_order_item soi
-                JOIN sales_order so ON so.entity_id = soi.order_id
-                    AND so.state NOT IN ('canceled','closed')
-                    AND so.created_at >= %s AND so.created_at < %s
-                WHERE soi.parent_item_id IS NULL
-                GROUP BY soi.product_id, soi.name, soi.sku
-                ORDER BY revenue_lm DESC
-                LIMIT 30
-            """, (lm_start.isoformat(), lm_end_excl))
-            top_lm = cur.fetchall()
+        try:
+            with conn.cursor() as cur:
+                # Top sellers last month
+                cur.execute("""
+                    SELECT soi.product_id, soi.name, soi.sku, SUM(soi.row_total) AS revenue_lm
+                    FROM sales_order_item soi
+                    JOIN sales_order so ON so.entity_id = soi.order_id
+                        AND so.state NOT IN ('canceled','closed')
+                        AND so.created_at >= %s AND so.created_at < %s
+                    WHERE soi.parent_item_id IS NULL
+                    GROUP BY soi.product_id, soi.name, soi.sku
+                    ORDER BY revenue_lm DESC
+                    LIMIT 30
+                """, (lm_start.isoformat(), lm_end_excl))
+                top_lm = cur.fetchall()
 
-            if not top_lm:
-                conn.close()
-                return {"products": []}
+                if not top_lm:
+                    return {"products": []}
 
-            top_ids = [r["product_id"] for r in top_lm]
+                top_ids = [r["product_id"] for r in top_lm]
 
-            # Which of those have sold this month?
-            fmt_ids = ",".join(["%s"] * len(top_ids))
-            cur.execute(f"""
-                SELECT DISTINCT soi.product_id
-                FROM sales_order_item soi
-                JOIN sales_order so ON so.entity_id = soi.order_id
-                    AND so.state NOT IN ('canceled','closed')
-                    AND so.created_at >= %s
-                WHERE soi.product_id IN ({fmt_ids})
-            """, [cm_start.isoformat()] + top_ids)
-            sold_this_month = {r["product_id"] for r in cur.fetchall()}
-
-        conn.close()
+                # Which of those have sold this month?
+                fmt_ids = ",".join(["%s"] * len(top_ids))
+                cur.execute(f"""
+                    SELECT DISTINCT soi.product_id
+                    FROM sales_order_item soi
+                    JOIN sales_order so ON so.entity_id = soi.order_id
+                        AND so.state NOT IN ('canceled','closed')
+                        AND so.created_at >= %s
+                    WHERE soi.product_id IN ({fmt_ids})
+                """, [cm_start.isoformat()] + top_ids)
+                sold_this_month = {r["product_id"] for r in cur.fetchall()}
+        finally:
+            conn.close()
 
         dormant = [
             {"name": r["name"], "sku": r["sku"], "revenue_last_month": round(float(r["revenue_lm"]), 2)}
@@ -620,8 +713,9 @@ def magento_product_dropoffs(days: int = 30, start_date: Optional[str] = None, e
         prev_end_excl = mysql_end_exclusive(ctx["prev_end"])
 
         conn = get_magento_conn()
-        with conn.cursor() as cur:
-            cur.execute("""
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
                 SELECT
                     prev.product_id,
                     prev.name,
@@ -649,9 +743,10 @@ def magento_product_dropoffs(days: int = 30, start_date: Optional[str] = None, e
                     WHERE soi.parent_item_id IS NULL
                     GROUP BY soi.product_id
                 ) curr ON curr.product_id = prev.product_id
-            """, (prev_start.isoformat(), prev_end_excl, start.isoformat(), end_excl))
-            rows = cur.fetchall()
-        conn.close()
+                """, (prev_start.isoformat(), prev_end_excl, start.isoformat(), end_excl))
+                rows = cur.fetchall()
+        finally:
+            conn.close()
 
         products = []
         for row in rows:
@@ -696,35 +791,49 @@ def opportunities(days: int = 30, start_date: Optional[str] = None, end_date: Op
     try:
         ctx = period_context(days, start_date, end_date, period_label)
         signals = {}
+        sources = {
+            "gsc": {"status": "unavailable"},
+            "magento_categories": {"status": "unavailable"},
+            "magento_product_dropoffs": {"status": "unavailable"},
+            "magento_top_products": {"status": "unavailable"},
+        }
 
         # GSC: top pages by impressions
         try:
             pages_data = gsc_pages(days=days, limit=30, start_date=start_date, end_date=end_date)
             signals["gsc_pages"] = pages_data["pages"][:20]
-        except:
+            sources["gsc"] = {"status": "available", "count": len(signals["gsc_pages"])}
+        except Exception:
+            logger.exception("GSC pages unavailable for opportunities")
             signals["gsc_pages"] = []
 
         # Magento: category revenue with deltas
         try:
             signals["categories"] = magento_category_revenue(days=days, start_date=start_date, end_date=end_date)["categories"]
-        except:
+            sources["magento_categories"] = {"status": "available", "count": len(signals["categories"])}
+        except Exception:
+            logger.exception("Magento categories unavailable for opportunities")
             signals["categories"] = []
 
         # Magento: selected-period drop-offs vs prior equivalent period
         try:
             signals["product_dropoffs"] = magento_product_dropoffs(days=days, start_date=start_date, end_date=end_date)["products"][:6]
-        except:
+            sources["magento_product_dropoffs"] = {"status": "available", "count": len(signals["product_dropoffs"])}
+        except Exception:
+            logger.exception("Magento drop-offs unavailable for opportunities")
             signals["product_dropoffs"] = []
 
         # Magento: top products for the selected period
         try:
             signals["top_products"] = magento_top_products(days=days, start_date=start_date, end_date=end_date)["products"][:5]
-        except:
+            sources["magento_top_products"] = {"status": "available", "count": len(signals["top_products"])}
+        except Exception:
+            logger.exception("Magento top products unavailable for opportunities")
             signals["top_products"] = []
 
         prompt = f"""You are a business intelligence assistant for Mockett.com, which sells office hardware (grommets, power solutions, drawer pulls, cable management, signage hardware).
 
-The web operations manager is a solo person — they cannot action dozens of items. Identify the 5-7 most genuinely impactful opportunities from the data below. Focus on items where the gap between current performance and potential is large, specific, and actionable in a focused session.
+The web operations manager is a solo person — they cannot action dozens of items. Identify only the genuinely impactful opportunities from the data below. Focus on items where the gap between current performance and potential is large, specific, and actionable in a focused session.
 
 PERIOD CONTEXT:
 Opportunity count rule: Return up to 5 opportunities. Return fewer than 5 if the data does not show enough clear, focused signals. The goal is to flag where a human should look, not to create a work queue.
@@ -766,7 +875,7 @@ RULES:
 - Do not use generic language like "improve appeal", "optimize the page", or "boost performance"
 - Do not recommend broad SKU cleanup, catalog rewrites, title-template work, redesigns, or tasks that imply hundreds of edits
 - A low-CTR opportunity should name the specific page, category, or 1-3 item sample to review. It should not imply editing every SKU in that category.
-- action must come from this list ONLY: review_search_snippet_alignment, review_low_ctr_page_copy, review_featured_products, review_related_products, review_category_navigation, review_search_synonyms
+- action must come from this list ONLY: review_search_snippet_alignment, review_low_ctr_page_copy, review_featured_products, review_related_products, review_category_navigation
 - priority must be: high, med, or low
 - icon must be one of: 📈 📄 📦 ⚠️ ⭐ 🔍
 - No two items should have identical action values if avoidable
@@ -793,6 +902,7 @@ Return ONLY valid JSON, no markdown:
         raw = raw.strip()
 
         result = json.loads(raw)
+        result["opportunities"] = clean_ai_items(result.get("opportunities"), 5)
         result["generated_at"] = datetime.now().isoformat()
         result["period"] = {
             "label": ctx["label"],
@@ -803,6 +913,8 @@ Return ONLY valid JSON, no markdown:
             "mode": ctx["mode"],
             "comparison": ctx["comparison"],
         }
+        result["sources"] = sources
+        result["partial_data"] = any(s["status"] != "available" for s in sources.values())
         result["total"] = len(result.get("opportunities", []))
         return result
 
@@ -823,15 +935,27 @@ def ai_summary(days: int = 30, start_date: Optional[str] = None, end_date: Optio
     try:
         ctx = period_context(days, start_date, end_date, period_label)
         metrics = {}
+        sources = {
+            "ga4": {"status": "unavailable"},
+            "gsc": {"status": "unavailable"},
+            "gsc_pages": {"status": "unavailable"},
+            "magento_categories": {"status": "unavailable"},
+            "magento_top_products": {"status": "unavailable"},
+            "magento_product_dropoffs": {"status": "unavailable"},
+        }
 
         try:
             metrics["ga4"] = ga4_kpis(days=days, start_date=start_date, end_date=end_date)
-        except:
+            sources["ga4"] = {"status": "available"}
+        except Exception:
+            logger.exception("GA4 unavailable for AI summary")
             metrics["ga4"] = None
 
         try:
             metrics["gsc"] = gsc_summary(days=days, start_date=start_date, end_date=end_date)
-        except:
+            sources["gsc"] = {"status": "available"}
+        except Exception:
+            logger.exception("GSC summary unavailable for AI summary")
             metrics["gsc"] = None
 
         try:
@@ -839,22 +963,30 @@ def ai_summary(days: int = 30, start_date: Optional[str] = None, end_date: Optio
             metrics["low_ctr_pages"] = [
                 p for p in gsc_opps["pages"] if p["impressions"] > 5000 and p["ctr"] < 2.0
             ][:3]
-        except:
+            sources["gsc_pages"] = {"status": "available", "count": len(gsc_opps["pages"])}
+        except Exception:
+            logger.exception("GSC pages unavailable for AI summary")
             metrics["low_ctr_pages"] = None
 
         try:
             metrics["categories"] = magento_category_revenue(days=days, start_date=start_date, end_date=end_date)["categories"][:6]
-        except:
+            sources["magento_categories"] = {"status": "available", "count": len(metrics["categories"])}
+        except Exception:
+            logger.exception("Magento categories unavailable for AI summary")
             metrics["categories"] = None
 
         try:
             metrics["top_products"] = magento_top_products(days=days, start_date=start_date, end_date=end_date)["products"][:5]
-        except:
+            sources["magento_top_products"] = {"status": "available", "count": len(metrics["top_products"])}
+        except Exception:
+            logger.exception("Magento top products unavailable for AI summary")
             metrics["top_products"] = None
 
         try:
             metrics["product_dropoffs"] = magento_product_dropoffs(days=days, start_date=start_date, end_date=end_date)["products"][:5]
-        except:
+            sources["magento_product_dropoffs"] = {"status": "available", "count": len(metrics["product_dropoffs"])}
+        except Exception:
+            logger.exception("Magento product drop-offs unavailable for AI summary")
             metrics["product_dropoffs"] = None
 
         # Build prompt from only available data
@@ -891,7 +1023,9 @@ def ai_summary(days: int = 30, start_date: Optional[str] = None, end_date: Optio
                     "mode": ctx["mode"],
                     "comparison": ctx["comparison"],
                 },
-                "data_snapshot": {"sessions": None, "revenue": None, "impressions": None, "ctr": None}
+                "data_snapshot": {"sessions": None, "revenue": None, "impressions": None, "ctr": None},
+                "sources": sources,
+                "partial_data": True,
             }
 
         prompt = f"""You are a business intelligence assistant for Mockett.com, which sells office hardware (grommets, power solutions, drawer pulls, cable management).
@@ -906,7 +1040,7 @@ Comparison period: {ctx['comparison']['start_date']} to {ctx['comparison']['end_
 BUSINESS DATA:
 {chr(10).join(sections)}
 
-Generate 4 executive insights based ONLY on the numbers above.
+Generate up to 4 executive insights based ONLY on the numbers above. Return fewer than 4 if the signals are weak or repetitive.
 
 STRICT RULES:
 - Respect the period context. Use "{ctx['label']}", "selected period", or the exact dates.
@@ -914,7 +1048,7 @@ STRICT RULES:
 - For 90-day ranges, frame insights as a quarterly trend review. For 270-day ranges, frame insights as long-term trend review and avoid urgent action language unless a metric is an extreme outlier.
 - Every insight MUST cite a specific number from the data
 - Plain English only — no technical terms, no jargon
-- Never mention missing data, tracking, null values, or system issues
+- If only partial source data is available, stay within the available source numbers and do not imply a full-site read.
 - Each insight must say why the metric matters and name the kind of review suggested
 - Do not infer causes such as stock, visibility, appeal, or seasonality unless the provided data shows that cause
 - Do not use generic language like "improve appeal", "optimize the page", or "boost performance"
@@ -922,7 +1056,6 @@ STRICT RULES:
 - For low-CTR page signals, frame the action as a focused review of 1-3 named pages' search snippet and visible page copy. Do not imply SKU-wide metadata edits.
 - Each suggested review must be focused enough to complete in under 2 hours
 - Suggest exactly ONE action per insight from this approved list:
-  review_search_synonyms, review_zero_result_terms, review_search_redirects,
   review_search_snippet_alignment, review_low_ctr_page_copy, review_related_products,
   review_featured_products, review_category_navigation
 - No two insights should suggest the same action
@@ -950,6 +1083,7 @@ Return ONLY valid JSON, no markdown:
         raw = raw.strip()
 
         result = json.loads(raw)
+        result["insights"] = clean_ai_items(result.get("insights"), 4)
         result["generated_at"] = datetime.now().isoformat()
         result["period"] = {
             "label": ctx["label"],
@@ -966,6 +1100,8 @@ Return ONLY valid JSON, no markdown:
             "impressions": metrics["gsc"]["impressions"]          if metrics["gsc"] else None,
             "ctr":         metrics["gsc"]["ctr"]                  if metrics["gsc"] else None,
         }
+        result["sources"] = sources
+        result["partial_data"] = any(s["status"] != "available" for s in sources.values())
         return result
 
     except Exception as e:
