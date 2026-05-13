@@ -1162,6 +1162,80 @@ Return ONLY valid JSON, no markdown:
             return deterministic_opportunities(signals, sources, ctx, "openai_unavailable")
         api_error(e)
 
+@app.get("/api/magento/revenue-aov")
+def magento_revenue_aov(days: int = 30, start_date: Optional[str] = None, end_date: Optional[str] = None):
+    """
+    Magento order revenue and AOV for the selected period vs prior equivalent period.
+    Replaces GA4 purchaseRevenue as the headline revenue signal and powers the AOV KPI card.
+    """
+    try:
+        ctx        = period_context(days, start_date, end_date)
+        start      = ctx["start"]
+        end_excl   = mysql_end_exclusive(ctx["end"])
+        prev_start = ctx["prev_start"]
+        prev_end_excl = mysql_end_exclusive(ctx["prev_end"])
+
+        conn = get_magento_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT
+                        SUM(CASE WHEN created_at >= %s AND created_at < %s THEN base_grand_total ELSE 0 END) AS revenue_current,
+                        SUM(CASE WHEN created_at >= %s AND created_at < %s THEN base_grand_total ELSE 0 END) AS revenue_previous,
+                        COUNT(CASE WHEN created_at >= %s AND created_at < %s THEN entity_id END) AS orders_current,
+                        COUNT(CASE WHEN created_at >= %s AND created_at < %s THEN entity_id END) AS orders_previous
+                    FROM sales_order
+                    WHERE state NOT IN ('canceled', 'closed')
+                        AND created_at >= %s AND created_at < %s
+                """, (
+                    start.isoformat(), end_excl,
+                    prev_start.isoformat(), prev_end_excl,
+                    start.isoformat(), end_excl,
+                    prev_start.isoformat(), prev_end_excl,
+                    prev_start.isoformat(), end_excl,
+                ))
+                row = cur.fetchone()
+        finally:
+            conn.close()
+
+        rev_curr  = float(row["revenue_current"]  or 0)
+        rev_prev  = float(row["revenue_previous"] or 0)
+        ord_curr  = int(row["orders_current"]     or 0)
+        ord_prev  = int(row["orders_previous"]    or 0)
+
+        aov_curr = round(rev_curr / ord_curr, 2) if ord_curr else 0
+        aov_prev = round(rev_prev / ord_prev, 2) if ord_prev else 0
+
+        return {
+            "period": {
+                "label":      ctx["label"],
+                "start_date": ctx["start_date"],
+                "end_date":   ctx["end_date"],
+                "comparison": ctx["comparison"],
+            },
+            "current": {
+                "revenue": round(rev_curr, 2),
+                "orders":  ord_curr,
+                "aov":     aov_curr,
+            },
+            "previous": {
+                "revenue": rev_prev,
+                "orders":  ord_prev,
+                "aov":     aov_prev,
+            },
+            "deltas": {
+                "revenue": pct_delta(rev_curr, rev_prev),
+                "aov":     pct_delta(aov_curr, aov_prev),
+                "orders":  pct_delta(ord_curr, ord_prev),
+            },
+            "metric_notes": {
+                "revenue": "Magento base_grand_total for non-cancelled/closed orders. Includes tax and shipping.",
+                "aov":     "Magento average order value: revenue / order count for non-cancelled/closed orders.",
+            }
+        }
+
+    except Exception as e:
+        api_error(e)
 
 # ═══════════════════════════════════════════════════════════════════
 # AI SUMMARY ENDPOINT
