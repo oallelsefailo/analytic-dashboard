@@ -1646,9 +1646,10 @@ def source_health():
     # GSC
     try:
         svc = get_gsc_service()
+        safe_date = (date.today() - timedelta(days=5)).isoformat()
         svc.searchanalytics().query(
             siteUrl=GSC_SITE_URL,
-            body={"startDate": "yesterday", "endDate": "yesterday", "dimensions": []}
+            body={"startDate": safe_date, "endDate": safe_date, "dimensions": []}
         ).execute()
         result["gsc"] = {"status": "ok"}
     except GoogleAuthError as e:
