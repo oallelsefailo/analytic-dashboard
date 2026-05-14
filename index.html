@@ -218,6 +218,10 @@
   .opp-evidence { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
   .evidence-pill { border:1px solid var(--border); border-radius:6px; padding:3px 8px; font-size:11px; color:var(--text3); background:rgba(255,255,255,0.02); }
   .evidence-pill strong { color:var(--text2); font-weight:600; }
+  .auth-warning {background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); border-left: 4px solid var(--amber); border-radius: var(--radius); padding: 12px 18px; display: flex; align-items: flex-start; gap: 12px; font-size: 13px; color: var(--text2); line-height: 1.55;}
+.auth-warning-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.auth-warning strong { color: var(--amber); }
+.auth-warning.hidden { display: none; }
   @media (max-width:1100px) {
     body { overflow:auto; } .shell { min-height:100vh; height:auto; }
     .kpi-grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
@@ -358,6 +362,16 @@
         <span class="ds-chip pending" id="ds-ga4">GA4 checking</span>
         <span class="ds-chip pending" id="ds-gsc">Search Console checking</span>
         <span class="ds-chip pending" id="ds-magento">Magento 2 checking</span>
+      </div>
+      <div class="auth-warning hidden" id="auth-warning">
+        <div class="auth-warning-icon">⚠️</div>
+        <div>
+          <strong>Google authorization needs to be renewed.</strong>
+          GA4 and Search Console data is temporarily unavailable.
+          Run <code>scripts/get_token.py</code> locally, copy the new
+          <code>credentials/oauth-token.json</code> to the server, and restart the app.
+          See <code>docs/google-auth-recovery.md</code>.
+        </div>
       </div>
       <div class="period-coverage" id="period-coverage">Selected analytics period will appear after data loads.</div>
       <div class="signal-strip" id="executive-signal-strip">
@@ -549,6 +563,37 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
+async function checkSourceHealth() {
+  try {
+    const res = await fetch(API + '/api/source-health');
+    if (!res.ok) return;
+    const data = await res.json();
+    const warning = document.getElementById('auth-warning');
+    if (!warning) return;
+
+    const ga4Auth  = data.ga4?.status  === 'auth_required';
+    const gscAuth  = data.gsc?.status  === 'auth_required';
+    const anyAuth  = ga4Auth || gscAuth;
+
+    // Show/hide warning banner
+    warning.classList.toggle('hidden', !anyAuth);
+
+    // Update source chips to be more specific
+    if (ga4Auth) {
+      setSourceStatus('ga4', 'unavailable', 'GA4 — reauth required');
+    }
+    if (gscAuth) {
+      setSourceStatus('gsc', 'unavailable', 'Search Console — reauth required');
+    }
+    if (data.magento?.status === 'unavailable') {
+      setSourceStatus('magento', 'unavailable', 'Magento unavailable');
+    }
+  } catch (e) {
+    // Health check itself failed — non-fatal, don't surface to UI
+    console.warn('Source health check failed:', e);
+  }
+}
+
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light');
   document.getElementById('theme-icon').textContent = isLight ? '🌙' : '☀️';
@@ -1035,7 +1080,7 @@ async function loadDashboard() {
     const panel=document.getElementById('product-dropoff-panel'); if(panel) panel.style.display='none';
   }
 
-  updateLiveBadge(); hideLoadingState(); dashboardHasLoaded=true;
+  updateLiveBadge(); checkSourceHealth(); hideLoadingState(); dashboardHasLoaded=true;
   const currentPage=document.querySelector('.page.active');
   if(currentPage?.id==='page-ai') loadAiSummary();
   if(currentPage?.id==='page-opps') loadOpportunities();

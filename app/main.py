@@ -4,7 +4,9 @@ Run: uvicorn main:app --reload --port 8000
 """
 
 import logging
-import os, json, re
+import logging.handlers
+import os, json, re, sys
+from pathlib import Path
 from datetime import date, timedelta, datetime
 from pathlib import Path
 from typing import Optional
@@ -22,6 +24,8 @@ from google.analytics.data_v1beta.types import (
     DateRange, Dimension, Metric, RunReportRequest, OrderBy
 )
 from googleapiclient.discovery import build
+import google.auth.exceptions
+import google.api_core.exceptions
 import pymysql
 from openai import OpenAI
 
@@ -41,6 +45,36 @@ if STATIC_DIR.is_dir():
 @app.get("/")
 def serve_dashboard():
     return FileResponse(PROJECT_ROOT / "index.html")
+
+# ── Logging setup ──────────────────────────────────────────────────
+LOG_DIR = PROJECT_ROOT / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
+def _build_logger():
+    fmt = logging.Formatter(
+        "%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    logger = logging.getLogger("mockett")
+    logger.setLevel(logging.DEBUG)
+
+    # Rotating file — keep 7 days of 10 MB files
+    fh = logging.handlers.RotatingFileHandler(
+        LOG_DIR / "dashboard.log", maxBytes=10 * 1024 * 1024, backupCount=7, encoding="utf-8"
+    )
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(fmt)
+
+    # Stdout for systemd / journalctl
+    sh = logging.StreamHandler(sys.stdout)
+    sh.setLevel(logging.INFO)
+    sh.setFormatter(fmt)
+
+    logger.addHandler(fh)
+    logger.addHandler(sh)
+    return logger
+
+logger = _build_logger()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -63,45 +97,149 @@ else:
 # AUTH & CLIENTS
 # ═══════════════════════════════════════════════════════════════════
 
-def get_credentials():
+# ── Custom exception so callers can distinguish auth problems ───────
+class GoogleAuthError(Exception):
+    """Raised when Google OAuth or service account auth is not usable."""
+    def __init__(self, source: str, detail: str):
+        self.source = source          # "ga4" or "gsc"
+        self.detail = detail          # safe string, no secrets
+        super().__init__(f"[{source}] {detail}")
+
+
+# ── OAuth credential loader ─────────────────────────────────────────
+def get_credentials() -> "google.oauth2.credentials.Credentials":
+    if not OAUTH_TOKEN.exists():
+        msg = "OAuth token file not found. Run scripts/get_token.py locally and copy to server."
+        logger.error("Google auth: %s", msg)
+        raise GoogleAuthError("google", msg)
+
     with open(OAUTH_TOKEN) as f:
         td = json.load(f)
+
     creds = Credentials(
-        token=td["token"], refresh_token=td["refresh_token"],
-        token_uri=td["token_uri"], client_id=td["client_id"],
-        client_secret=td["client_secret"], scopes=td["scopes"],
+        token=td["token"],
+        refresh_token=td["refresh_token"],
+        token_uri=td["token_uri"],
+        client_id=td["client_id"],
+        client_secret=td["client_secret"],
+        scopes=td["scopes"],
     )
+
     try:
         creds.refresh(Request())
+        # Write updated token back safely
         td["token"] = creds.token
-        with open(OAUTH_TOKEN, "w") as f:
+        tmp = OAUTH_TOKEN.with_suffix(".tmp")
+        with open(tmp, "w") as f:
             json.dump(td, f, indent=2)
-    except Exception:
-        logger.exception("OAuth token refresh failed; using existing token")
+        tmp.replace(OAUTH_TOKEN)
+        logger.debug("Google OAuth token refreshed successfully.")
+    except google.auth.exceptions.RefreshError as e:
+        err_str = str(e)
+        if "invalid_grant" in err_str:
+            msg = (
+                "OAuth refresh token expired or was revoked. "
+                "Run scripts/get_token.py locally and redeploy credentials/oauth-token.json. "
+                "See docs/google-auth-recovery.md."
+            )
+            logger.error("Google auth REAUTHORIZATION REQUIRED: %s", msg)
+            raise GoogleAuthError("google", msg) from e
+        msg = f"OAuth token refresh failed with unexpected error. Details: {type(e).__name__}"
+        logger.error("Google auth refresh error: %s", msg)
+        raise GoogleAuthError("google", msg) from e
+    except Exception as e:
+        msg = f"Unexpected error during OAuth refresh: {type(e).__name__}"
+        logger.error("Google auth: %s", msg)
+        raise GoogleAuthError("google", msg) from e
+
     return creds
 
+
+# ── GA4 credentials: prefer service account, fall back to OAuth ─────
 def get_ga4_credentials():
+    """
+    Returns credentials for GA4.
+    Prefers service account if configured and accessible.
+    Falls back to OAuth. Raises GoogleAuthError if neither works.
+    """
     if ga4_service_account_path and ga4_service_account_path.exists():
-        return service_account.Credentials.from_service_account_file(
-            ga4_service_account_path,
-            scopes=["https://www.googleapis.com/auth/analytics.readonly"],
-        )
+        try:
+            creds = service_account.Credentials.from_service_account_file(
+                ga4_service_account_path,
+                scopes=["https://www.googleapis.com/auth/analytics.readonly"],
+            )
+            logger.debug("GA4: using service account credentials.")
+            return creds
+        except Exception as e:
+            logger.warning(
+                "GA4 service account load failed (%s); falling back to OAuth.", type(e).__name__
+            )
+    else:
+        logger.debug("GA4: no service account configured; using OAuth.")
+
     return get_credentials()
+
 
 def get_ga4_client():
     return BetaAnalyticsDataClient(credentials=get_ga4_credentials())
 
+
 def run_ga4_report(request: RunReportRequest):
+    """
+    Run a GA4 report.
+    On service account permission denial, retries with OAuth.
+    Raises GoogleAuthError on auth failure.
+    Raises HTTPException(500) on other errors.
+    """
     try:
-        return get_ga4_client().run_report(request)
-    except Exception:
-        if ga4_service_account_path and ga4_service_account_path.exists():
-            logger.exception("GA4 service account request failed; retrying with OAuth token")
-            return BetaAnalyticsDataClient(credentials=get_credentials()).run_report(request)
+        creds = get_ga4_credentials()
+        return BetaAnalyticsDataClient(credentials=creds).run_report(request)
+    except GoogleAuthError:
         raise
+    except google.api_core.exceptions.PermissionDenied as e:
+        if ga4_service_account_path and ga4_service_account_path.exists():
+            logger.warning(
+                "GA4 service account permission denied for property %s; falling back to OAuth.",
+                GA4_PROPERTY_ID,
+            )
+            try:
+                oauth_creds = get_credentials()
+                return BetaAnalyticsDataClient(credentials=oauth_creds).run_report(request)
+            except GoogleAuthError:
+                raise
+            except Exception as fallback_e:
+                logger.error("GA4 OAuth fallback also failed: %s", type(fallback_e).__name__)
+                raise HTTPException(500, detail="Dashboard data is unavailable for this request.") from fallback_e
+        logger.error("GA4 PermissionDenied (no service account to fall back to): %s", str(e)[:120])
+        raise HTTPException(500, detail="Dashboard data is unavailable for this request.") from e
+    except Exception as e:
+        logger.error("GA4 report failed: %s: %s", type(e).__name__, str(e)[:120])
+        raise HTTPException(500, detail="Dashboard data is unavailable for this request.") from e
+
 
 def get_gsc_service():
-    return build("searchconsole", "v1", credentials=get_credentials())
+    """Build a Search Console service using OAuth credentials."""
+    try:
+        creds = get_credentials()
+        svc = build("searchconsole", "v1", credentials=creds)
+        logger.debug("GSC: service built with OAuth credentials.")
+        return svc
+    except GoogleAuthError:
+        raise
+    except Exception as e:
+        logger.error("GSC service build failed: %s", type(e).__name__)
+        raise
+
+
+# ── api_error helper — now surfaces GoogleAuthError distinctly ───────
+def api_error(e):
+    if isinstance(e, HTTPException):
+        raise e
+    if isinstance(e, GoogleAuthError):
+        logger.error("API endpoint hit GoogleAuthError: %s", e.detail)
+        raise HTTPException(503, detail="Google authorization needs to be renewed. Contact the dashboard administrator.")
+    logger.exception("API request failed")
+    raise HTTPException(500, detail="Dashboard data is unavailable for this request.")
 
 def get_magento_conn():
     return pymysql.connect(
@@ -196,12 +334,6 @@ def period_context(days: int = 30, start_date: Optional[str] = None, end_date: O
 
 def mysql_end_exclusive(end_date_value: date):
     return (end_date_value + timedelta(days=1)).isoformat()
-
-def api_error(e):
-    if isinstance(e, HTTPException):
-        raise e
-    logger.exception("API request failed")
-    raise HTTPException(500, detail="Dashboard data is unavailable for this request.")
 
 def pct_delta(c, p):
     if not p: return None
@@ -1471,3 +1603,79 @@ def health():
             "oauth_token": OAUTH_TOKEN.exists(),
         },
     }
+
+@app.get("/api/source-health")
+def source_health():
+    """
+    Safe diagnostic endpoint. Returns per-source status without
+    exposing secrets, tokens, or credential file contents.
+    Statuses: ok | configured | unconfigured | auth_required |
+              permission_denied | unavailable | error
+    """
+    result = {}
+
+    # App
+    result["app"] = {"status": "ok"}
+
+    # GA4
+    try:
+        creds = get_ga4_credentials()
+        client = BetaAnalyticsDataClient(credentials=creds)
+        from google.analytics.data_v1beta.types import RunReportRequest as RRR, DateRange, Metric
+        client.run_report(RRR(
+            property=f"properties/{GA4_PROPERTY_ID}",
+            date_ranges=[DateRange(start_date="yesterday", end_date="yesterday")],
+            metrics=[Metric(name="sessions")],
+        ))
+        result["ga4"] = {"status": "ok"}
+    except GoogleAuthError as e:
+        result["ga4"] = {
+            "status": "auth_required",
+            "message": "Google Analytics authorization needs to be renewed.",
+            "safe_detail": "OAuth refresh token expired or was revoked. Run scripts/get_token.py and redeploy credentials.",
+        }
+    except google.api_core.exceptions.PermissionDenied:
+        result["ga4"] = {
+            "status": "permission_denied",
+            "message": "Service account does not have access to this GA4 property.",
+            "safe_detail": f"Property ID {GA4_PROPERTY_ID} is not accessible with configured credentials.",
+        }
+    except Exception as e:
+        result["ga4"] = {"status": "error", "safe_detail": type(e).__name__}
+
+    # GSC
+    try:
+        svc = get_gsc_service()
+        svc.searchanalytics().query(
+            siteUrl=GSC_SITE_URL,
+            body={"startDate": "yesterday", "endDate": "yesterday", "dimensions": []}
+        ).execute()
+        result["gsc"] = {"status": "ok"}
+    except GoogleAuthError as e:
+        result["gsc"] = {
+            "status": "auth_required",
+            "message": "Search Console authorization needs to be renewed.",
+            "safe_detail": "OAuth refresh token expired or was revoked. Run scripts/get_token.py and redeploy credentials.",
+        }
+    except Exception as e:
+        result["gsc"] = {"status": "error", "safe_detail": type(e).__name__}
+
+    # Magento
+    try:
+        conn = get_magento_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        finally:
+            conn.close()
+        result["magento"] = {"status": "ok"}
+    except Exception as e:
+        result["magento"] = {"status": "unavailable", "safe_detail": type(e).__name__}
+
+    # OpenAI
+    if os.getenv("OPENAI_API_KEY"):
+        result["openai"] = {"status": "configured"}
+    else:
+        result["openai"] = {"status": "unconfigured"}
+
+    return result
