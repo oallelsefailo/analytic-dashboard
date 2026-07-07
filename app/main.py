@@ -46,6 +46,10 @@ if STATIC_DIR.is_dir():
 def serve_dashboard():
     return FileResponse(PROJECT_ROOT / "index.html")
 
+@app.get("/_usage")
+def serve_usage():
+    return FileResponse(PROJECT_ROOT / "usage.html")
+
 # ── Logging setup ──────────────────────────────────────────────────
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_DIR.mkdir(exist_ok=True)
