@@ -81,7 +81,7 @@
   <div class="stat-row">
     <div class="stat-box">
       <div class="stat-val" id="totalViews">—</div>
-      <div class="stat-label">Total Views</div>
+      <div class="stat-label">Total Visit-Days</div>
     </div>
     <div class="stat-box">
       <div class="stat-val" id="uniqueUsers">—</div>
@@ -89,7 +89,7 @@
     </div>
     <div class="stat-box">
       <div class="stat-val" id="avgDaily">—</div>
-      <div class="stat-label">Avg / Day</div>
+      <div class="stat-label">Avg Visitors / Day</div>
     </div>
   </div>
 
@@ -135,14 +135,14 @@ async function load() {
 }
 
 function render(d) {
-  document.getElementById('totalViews').textContent = d.total_views.toLocaleString();
+  document.getElementById('totalViews').textContent = d.total_visit_days.toLocaleString();
   document.getElementById('uniqueUsers').textContent = d.by_user.length;
   document.getElementById('avgDaily').textContent = currentDays > 0
-    ? (d.total_views / currentDays).toFixed(1) : '—';
+    ? (d.total_visit_days / currentDays).toFixed(1) : '—';
 
   // Chart
   const labels = d.by_period.map(p => p.period);
-  const values = d.by_period.map(p => p.visits);
+  const values = d.by_period.map(p => p.visitors);
 
   if (chart) chart.destroy();
   chart = new Chart(document.getElementById('chart'), {
@@ -173,13 +173,13 @@ function render(d) {
     el.innerHTML = '<div class="empty">No visits recorded yet</div>';
     return;
   }
-  const maxVisits = d.by_user[0].visits;
+  const maxVisits = d.by_user[0].days_visited;
   el.innerHTML = `<table>
-    <thead><tr><th>User</th><th>Visits</th><th style="width:40%"></th></tr></thead>
+    <thead><tr><th>User</th><th>Days Active</th><th style="width:40%"></th></tr></thead>
     <tbody>${d.by_user.map(u => `<tr>
       <td class="mono">${u.email}</td>
-      <td>${u.visits}</td>
-      <td><div class="visits-bar"><div class="bar-fill" style="width:${Math.max(4, (u.visits/maxVisits)*100)}%"></div></div></td>
+      <td>${u.days_visited}</td>
+      <td><div class="visits-bar"><div class="bar-fill" style="width:${Math.max(4, (u.days_visited/maxVisits)*100)}%"></div></div></td>
     </tr>`).join('')}</tbody>
   </table>`;
 }

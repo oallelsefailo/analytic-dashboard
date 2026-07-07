@@ -92,45 +92,42 @@ _usage_lock = threading.Lock()
 def _init_usage_db():
     conn = sqlite3.connect(str(USAGE_DB))
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS page_views (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        CREATE TABLE IF NOT EXISTS daily_visits (
             email TEXT NOT NULL,
-            path TEXT NOT NULL,
-            ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            visit_date TEXT NOT NULL,
+            ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (email, visit_date)
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_pv_ts ON page_views(ts)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_pv_email ON page_views(email)")
+    # Migrate: drop old page_views table if it exists
+    conn.execute("DROP TABLE IF EXISTS page_views")
     conn.commit()
     conn.close()
 
 _init_usage_db()
 
-def _log_page_view(email: str, path: str):
+def _log_daily_visit(email: str):
+    today = datetime.utcnow().strftime("%Y-%m-%d")
     with _usage_lock:
         conn = sqlite3.connect(str(USAGE_DB))
         try:
             conn.execute(
-                "INSERT INTO page_views (email, path, ts) VALUES (?, ?, ?)",
-                (email, path, datetime.utcnow().isoformat()),
+                "INSERT OR IGNORE INTO daily_visits (email, visit_date, ts) VALUES (?, ?, ?)",
+                (email, today, datetime.utcnow().isoformat()),
             )
             conn.commit()
         finally:
             conn.close()
 
-# Paths we don't want to log (static assets, API calls, favicon, etc.)
-_SKIP_PREFIXES = ("/static/", "/api/", "/favicon")
-
 @app.middleware("http")
 async def usage_tracking_middleware(request: Request, call_next):
     response = await call_next(request)
-    path = request.url.path
-    # Only log actual page views, not API calls or static assets
-    if not any(path.startswith(p) for p in _SKIP_PREFIXES):
+    # Only log on the main page load, not API/static/hidden pages
+    if request.url.path == "/":
         email = request.headers.get("Cf-Access-Authenticated-User-Email", "").strip()
         if email:
             try:
-                _log_page_view(email, path)
+                _log_daily_visit(email)
             except Exception:
                 logger.debug("Usage log write failed", exc_info=True)
     return response
@@ -140,39 +137,39 @@ async def usage_tracking_middleware(request: Request, call_next):
 def usage_stats(group: str = "day", days: int = 30):
     """
     Dashboard usage stats. Only for your eyes.
-    ?group=day|week|month  — how to bucket the counts
+    ?group=day|week|month  — how to bucket the visit days
     ?days=30               — how far back to look
     """
     days = max(1, min(days, 365))
-    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
 
     if group == "week":
-        date_expr = "strftime('%Y-W%W', ts)"
+        date_expr = "strftime('%Y-W%W', visit_date)"
     elif group == "month":
-        date_expr = "strftime('%Y-%m', ts)"
+        date_expr = "strftime('%Y-%m', visit_date)"
     else:
-        date_expr = "date(ts)"
+        date_expr = "visit_date"
 
     conn = sqlite3.connect(str(USAGE_DB))
     conn.row_factory = sqlite3.Row
     try:
-        # Per-user totals
+        # Per-user: how many distinct days they visited
         rows = conn.execute(
-            "SELECT email, COUNT(*) AS visits FROM page_views WHERE ts >= ? GROUP BY email ORDER BY visits DESC",
+            "SELECT email, COUNT(*) AS days_visited FROM daily_visits WHERE visit_date >= ? GROUP BY email ORDER BY days_visited DESC",
             (cutoff,),
         ).fetchall()
-        by_user = [{"email": r["email"], "visits": r["visits"]} for r in rows]
+        by_user = [{"email": r["email"], "days_visited": r["days_visited"]} for r in rows]
 
-        # Time series
+        # Time series: unique visitors per period
         rows = conn.execute(
-            f"SELECT {date_expr} AS period, COUNT(*) AS visits FROM page_views WHERE ts >= ? GROUP BY period ORDER BY period",
+            f"SELECT {date_expr} AS period, COUNT(*) AS visitors FROM daily_visits WHERE visit_date >= ? GROUP BY period ORDER BY period",
             (cutoff,),
         ).fetchall()
-        by_period = [{"period": r["period"], "visits": r["visits"]} for r in rows]
+        by_period = [{"period": r["period"], "visitors": r["visitors"]} for r in rows]
 
-        # Total
+        # Total unique visit-days
         total = conn.execute(
-            "SELECT COUNT(*) AS n FROM page_views WHERE ts >= ?", (cutoff,)
+            "SELECT COUNT(*) AS n FROM daily_visits WHERE visit_date >= ?", (cutoff,)
         ).fetchone()["n"]
     finally:
         conn.close()
@@ -180,7 +177,7 @@ def usage_stats(group: str = "day", days: int = 30):
     return {
         "range_days": days,
         "group_by": group,
-        "total_views": total,
+        "total_visit_days": total,
         "by_user": by_user,
         "by_period": by_period,
     }
