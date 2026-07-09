@@ -119,15 +119,18 @@ def _log_daily_visit(email: str):
         finally:
             conn.close()
 
+_seen_today = {}  # in-memory cache: email -> date string, avoids hitting SQLite on every request
+
 @app.middleware("http")
 async def usage_tracking_middleware(request: Request, call_next):
     response = await call_next(request)
-    # Only log on the main page load, not API/static/hidden pages
-    if request.url.path == "/":
-        email = request.headers.get("Cf-Access-Authenticated-User-Email", "").strip()
-        if email:
+    email = request.headers.get("Cf-Access-Authenticated-User-Email", "").strip()
+    if email:
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        if _seen_today.get(email) != today:
             try:
                 _log_daily_visit(email)
+                _seen_today[email] = today
             except Exception:
                 logger.debug("Usage log write failed", exc_info=True)
     return response
